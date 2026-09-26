@@ -1,4 +1,6 @@
 #include "filter.hpp"
+#include "gst/gstclock.h"
+#include "gst/gstelement.h"
 
 typedef struct _GstMyFilter {
   GstElement element;
@@ -30,7 +32,7 @@ static void gst_my_filter_class_init(GstMyFilterClass * klass)
 
     GstPadTemplate * src_factory =
         gst_pad_template_new (
-            "source",
+            "src",
             GST_PAD_SRC,
             GST_PAD_ALWAYS,
             gst_caps_ref(caps)
@@ -64,7 +66,7 @@ static void gst_my_filter_init (GstMyFilter *filter)
     gst_element_add_pad (GST_ELEMENT (filter), filter->sinkpad);
 
     /* pad through which data goes out of the element */
-    filter->srcpad = gst_pad_new_from_template(gst_element_class_get_pad_template(klass, "source"), "source");
+    filter->srcpad = gst_pad_new_from_template(gst_element_class_get_pad_template(klass, "src"), "src");
     gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
 
     /* properties initial value */
@@ -95,12 +97,38 @@ gboolean gst_my_filter_sink_event (GstPad *pad, GstObject *parent, GstEvent  *ev
   return ret;
 }
 
+GstClockTime last_clock_time = 0;
+GstClockTime elapsed_time;
+const int frames = 20;
+int cur_frame = 1;
+
 GstFlowReturn gst_my_filter_chain (GstPad *pad, GstObject *parent, GstBuffer *buf)
 {
     GstMyFilter *filter = GST_MY_FILTER (parent);
+    GstElement  *filter_el = GST_ELEMENT(parent);
 
-    if (!filter->silent)
-        g_print ("Have data of size %" G_GSIZE_FORMAT" bytes!\n", gst_buffer_get_size (buf));
+    GstClockTime cur_clock_time = gst_element_get_current_running_time(filter_el);
+
+    if (last_clock_time == 0) 
+    {
+        last_clock_time = cur_clock_time;
+    }
+    else
+    {
+        if (cur_frame < frames)
+        {
+            cur_frame++;
+        }
+        else
+        {
+            cur_frame = 1;
+
+            elapsed_time = cur_clock_time - last_clock_time;
+            last_clock_time = cur_clock_time;
+        
+            double fps = frames * 1000000000.f / elapsed_time;
+        }
+    }
 
     return gst_pad_push (filter->srcpad, buf);
 }
