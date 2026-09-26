@@ -3,6 +3,7 @@
 #include <gst/gst.h>
 #include <gst/audio/audio.h>
 
+#include "debug.h"
 #include "filter.hpp"
 
 long frame_i = 0;
@@ -23,11 +24,14 @@ int main(int argc, char *argv[])
   }
 
   /* Create the elements */
-  source          = gst_element_factory_make ("videotestsrc", "source");
+  source          = gst_element_factory_make ("v4l2src", "source");
   video_convert   = gst_element_factory_make ("videoconvert", "video_convert");
   processor       = gst_element_factory_make ("myfilter", "custom_frame_processor");
   video_convert2  = gst_element_factory_make ("videoconvert", "video_convert_2");
   sink            = gst_element_factory_make ("autovideosink", "sink");
+
+  print_pad_capabilities(processor, "sink");
+  print_pad_capabilities(processor, "src");
 
   /* Create the empty pipeline */
   pipeline = gst_pipeline_new ("test-pipeline");
