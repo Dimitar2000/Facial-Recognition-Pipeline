@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 
   /* Build the pipeline */
   pipeline = gst_parse_launch(
-    "playbin uri=https://gstreamer.freedesktop.org/data/media/sintel_trailer-480p.webm",
+    "gst-launch-1.0 v4l2src device=/dev/video0 ! videoconvert ! autovideosink",
     NULL);
 
   /* Start playing */
