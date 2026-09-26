@@ -7,7 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GS REQUIRED gstreamer-1.0)
 
-add_executable(facial-recog-pipeline main.cpp)
+add_executable(facial-recog-pipeline main.cpp filter.cpp)
 
 target_include_directories(facial-recog-pipeline PUBLIC ${GS_INCLUDE_DIRS})
 target_link_libraries(facial-recog-pipeline ${GS_LIBRARIES})
