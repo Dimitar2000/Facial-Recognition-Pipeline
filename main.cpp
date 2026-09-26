@@ -1,59 +1,56 @@
-#include "glib-object.h"
-#include <gst/gst.h>
+#include <iostream>
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
+#include <gst/gst.h>
+#include <gst/audio/audio.h>
+
+#include "filter.hpp"
+
+long frame_i = 0;
 
 int main(int argc, char *argv[])
 {
-  GstElement *pipeline, *source, *filter, *sink;
+  GstElement *pipeline, *source, *video_convert, *processor, *video_convert2, *sink;
   GstBus *bus;
   GstMessage *msg;
-  GstStateChangeReturn ret;
 
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
 
+  if (!gst_element_register(nullptr, "myfilter", GST_RANK_NONE, GST_TYPE_MY_FILTER))
+  {
+    std::cerr << "Failed to register myprocess element" << std::endl;
+    return 1;
+  }
+
   /* Create the elements */
-  source = gst_element_factory_make ("videotestsrc", "source");
-  sink = gst_element_factory_make ("autovideosink", "sink");
-  filter = gst_element_factory_make ("vertigotv", "filter");
+  source          = gst_element_factory_make ("videotestsrc", "source");
+  video_convert   = gst_element_factory_make ("videoconvert", "video_convert");
+  processor       = gst_element_factory_make ("myfilter", "custom_frame_processor");
+  video_convert2  = gst_element_factory_make ("videoconvert", "video_convert_2");
+  sink            = gst_element_factory_make ("autovideosink", "sink");
 
   /* Create the empty pipeline */
   pipeline = gst_pipeline_new ("test-pipeline");
 
-  if (!pipeline || !source || !sink) {
+  if (!pipeline || !source || !video_convert || !processor || !video_convert || !sink)
+  {
     g_printerr ("Not all elements could be created.\n");
     return -1;
   }
 
-  /* Build the pipeline */
-  gst_bin_add_many (GST_BIN (pipeline), source, filter, sink, NULL);
-  if (gst_element_link (source, filter) != TRUE) {
+  /* Link all elements that can be automatically linked because they have "Always" pads */
+  gst_bin_add_many (GST_BIN (pipeline), source, video_convert, processor, video_convert2, sink, NULL);
+  
+  if (gst_element_link_many (source, video_convert, processor, video_convert2, sink, NULL) != TRUE) {
     g_printerr ("Elements could not be linked.\n");
     gst_object_unref (pipeline);
     return -1;
   }
 
-  if (gst_element_link (filter, sink) != TRUE) {
-    g_printerr ("Elements could not be linked.\n");
-    gst_object_unref (pipeline);
-    return -1;
-  }
+  /* Start playing the pipeline */
+  gst_element_set_state (pipeline, GST_STATE_PLAYING);
 
-  /* Modify the source's properties */
-  g_object_set (source, "pattern", 0, NULL);
-
-  /* Start playing */
-  ret = gst_element_set_state (pipeline, GST_STATE_PLAYING);
-  if (ret == GST_STATE_CHANGE_FAILURE) {
-    g_printerr ("Unable to set the pipeline to the playing state.\n");
-    gst_object_unref (pipeline);
-    return -1;
-  }
-
-  /* Wait until error or EOS */
+    /* Wait until error or EOS */
   bus = gst_element_get_bus (pipeline);
   msg = gst_bus_timed_pop_filtered (bus, GST_CLOCK_TIME_NONE, static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
 
@@ -66,7 +63,7 @@ int main(int argc, char *argv[])
       case GST_MESSAGE_ERROR:
         gst_message_parse_error (msg, &err, &debug_info);
         g_printerr ("Error received from element %s: %s\n",
-            GST_OBJECT_NAME (msg->src), err->message);
+            GST_OBJECT_NAME (msg->src->name), err->message);
         g_printerr ("Debugging information: %s\n",
             debug_info ? debug_info : "none");
         g_clear_error (&err);
