@@ -1,8 +1,7 @@
-* [ ] Choose source type
-
-* [ ] Choose OTS model
-
-* [ ] Choose C++ inference framework
+* [ ] Preparation
+    * [ ] Choose source type
+    * [ ] Choose OTS model
+    * [ ] Choose C++ inference framework
 
 * [ ] Base product
     * [ ] Load source from GStreamer
@@ -17,11 +16,15 @@
 * [ ] Create test setup
 
 * [ ] Handle source changes
+    * [ ] Requirements for handling
+    * [ ] Implement
 
 * [ ] Improve pipeline cycle speed
     * [ ] Choose OpenMP / CUDA
     * [ ] Kernel & Redesign
 
 * [ ] Handle errors
+    * [ ] Requirements for handling
+    * [ ] Implement
 
 * [ ] Benchmark
