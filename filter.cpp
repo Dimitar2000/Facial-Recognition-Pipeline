@@ -180,13 +180,7 @@ static void detect_and_bind_box(cv::Mat& frame, cv::CascadeClassifier& cascade, 
     for ( size_t i = 0; i < faces.size(); i++ )
     {
         cv::Rect r = faces[i];
-        cv::Mat smallImgROI;
-        std::vector<cv::Rect> nestedObjects;
-        cv::Point center;
         cv::Scalar color = cv::Scalar(255, 0, 0); // Color for Drawing tool
-        int radius;
-
-        double aspect_ratio = (double)r.width/r.height;
 
         r.x = r.x - (r.width * (sqrt(zoom_out_rec_scale) - 1) / 2);
         r.y = r.y - (r.height * (sqrt(zoom_out_rec_scale) - 1) / 2);
@@ -197,6 +191,5 @@ static void detect_and_bind_box(cv::Mat& frame, cv::CascadeClassifier& cascade, 
                   cv::Point(cvRound(r.x*scale), cvRound(r.y*scale)),
                   cv::Point(cvRound((r.x + r.width-1)*scale), cvRound((r.y + r.height-1)*scale)), 
                   color, 3, 8, 0);
-        
     }
 }
