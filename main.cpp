@@ -6,8 +6,6 @@
 #include "debug.h"
 #include "filter.hpp"
 
-long frame_i = 0;
-
 int main(int argc, char *argv[])
 {
   GstElement *pipeline, *source, *video_convert, *processor, *video_convert2, *sink;
@@ -29,9 +27,6 @@ int main(int argc, char *argv[])
   processor       = gst_element_factory_make ("myfilter", "custom_frame_processor");
   video_convert2  = gst_element_factory_make ("videoconvert", "video_convert_2");
   sink            = gst_element_factory_make ("autovideosink", "sink");
-
-  print_pad_capabilities(processor, "sink");
-  print_pad_capabilities(processor, "src");
 
   /* Create the empty pipeline */
   pipeline = gst_pipeline_new ("test-pipeline");
