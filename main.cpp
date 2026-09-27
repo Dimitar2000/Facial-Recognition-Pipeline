@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
   /* Create the empty pipeline */
   pipeline = gst_pipeline_new ("test-pipeline");
 
-  if (!pipeline || !source || !video_convert || !processor || !video_convert || !sink)
+  if (!pipeline || !source || !video_convert || !processor || !video_convert2 || !sink)
   {
     g_printerr ("Not all elements could be created.\n");
     return -1;
