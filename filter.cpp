@@ -1,16 +1,26 @@
 #include "filter.hpp"
+
+#include "glib.h"
 #include "gst/gstclock.h"
 #include "gst/gstelement.h"
 
-typedef struct _GstMyFilter {
-  GstElement element;
-  GstPad *sinkpad, *srcpad;
+#include "gst/video/video-info.h"
+#include "opencv2/core/mat.hpp"
+#include "opencv2/core/types.hpp"
+#include "opencv2/imgproc.hpp"
+#include "opencv2/objdetect.hpp"
 
-  gboolean silent;
+typedef struct _GstMyFilter {
+    GstElement element;
+    GstPad *sinkpad, *srcpad;
+
+    cv::CascadeClassifier classifier; 
 } GstMyFilter;
 
 G_DEFINE_TYPE (GstMyFilter, gst_my_filter, GST_TYPE_ELEMENT);
 GST_ELEMENT_REGISTER_DEFINE(my_filter, "my-filter", GST_RANK_NONE, GST_TYPE_MY_FILTER);
+
+static void detect_and_bind_box(cv::Mat& frame, cv::CascadeClassifier& cascade, double scale, double zoom_out_rec_scale);
 
 static void gst_my_filter_class_init(GstMyFilterClass * klass)
 {
@@ -69,8 +79,8 @@ static void gst_my_filter_init (GstMyFilter *filter)
     filter->srcpad = gst_pad_new_from_template(gst_element_class_get_pad_template(klass, "src"), "src");
     gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
 
-    /* properties initial value */
-    filter->silent = FALSE;
+    // Load classifiers from &quot;opencv/data/haarcascades&quot; directory 
+    filter->classifier.load("../haarcascade_frontalcatface.xml") ; 
 }
 
 gboolean gst_my_filter_sink_event (GstPad *pad, GstObject *parent, GstEvent  *event)
@@ -97,38 +107,96 @@ gboolean gst_my_filter_sink_event (GstPad *pad, GstObject *parent, GstEvent  *ev
   return ret;
 }
 
-GstClockTime last_clock_time = 0;
-GstClockTime elapsed_time;
-const int frames = 20;
-int cur_frame = 1;
-
 GstFlowReturn gst_my_filter_chain (GstPad *pad, GstObject *parent, GstBuffer *buf)
 {
     GstMyFilter *filter = GST_MY_FILTER (parent);
     GstElement  *filter_el = GST_ELEMENT(parent);
 
-    GstClockTime cur_clock_time = gst_element_get_current_running_time(filter_el);
+    GstClockTime clock_time_start = gst_element_get_current_running_time(filter_el);
 
-    if (last_clock_time == 0) 
-    {
-        last_clock_time = cur_clock_time;
-    }
-    else
-    {
-        if (cur_frame < frames)
-        {
-            cur_frame++;
-        }
-        else
-        {
-            cur_frame = 1;
+    // Create opencv Map view of the GstBuffer memory    
+    GstCaps *caps = gst_pad_get_current_caps(pad);
 
-            elapsed_time = cur_clock_time - last_clock_time;
-            last_clock_time = cur_clock_time;
-        
-            double fps = frames * 1000000000.f / elapsed_time;
-        }
+    if (!caps)
+    {
+        return gst_pad_push (filter->srcpad, buf);
     }
+
+    GstVideoInfo info;
+
+    if (!gst_video_info_from_caps(&info, caps)) {
+        // invalid caps
+        return GST_FLOW_ERROR;
+    }
+
+    guint width  = GST_VIDEO_INFO_WIDTH(&info);
+    guint height = GST_VIDEO_INFO_HEIGHT(&info);
+    guint stride = GST_VIDEO_INFO_PLANE_STRIDE(&info, 0);
+
+    GstVideoFrame frame;
+
+    if (gst_video_frame_map(&frame, &info, buf, GST_MAP_READ)) {
+
+        guint8 *data = (guint8 *)GST_VIDEO_FRAME_PLANE_DATA(&frame, 0);
+
+        cv::Mat f(height,
+                  width,
+                  CV_8UC3,
+                  data,
+                  stride);
+
+        detect_and_bind_box(f, filter->classifier, 1, 3);
+
+        gst_video_frame_unmap(&frame);
+    }
+
+    gst_caps_unref(caps);
+
+    GstClockTime clock_time_end = gst_element_get_current_running_time(filter_el);
+
+    g_print("Time to detect and draw boxes: %lu\n", clock_time_end - clock_time_start);
 
     return gst_pad_push (filter->srcpad, buf);
+}
+
+static void detect_and_bind_box(cv::Mat& frame, cv::CascadeClassifier& cascade, double scale, double zoom_out_rec_scale)
+{
+    std::vector<cv::Rect> faces;
+    cv::Mat gray, smallImg;
+   
+    auto f = frame.clone();
+    
+    cvtColor(f, gray, cv::COLOR_RGB2GRAY); // Convert to Gray Scale
+
+    // Resize the Grayscale Image 
+    resize( gray, smallImg, cv::Size(), 1 / scale, 1 / scale, cv::INTER_LINEAR); 
+    equalizeHist( smallImg, smallImg );
+
+    // Detect faces of different sizes using cascade classifier 
+    cascade.detectMultiScale(smallImg, faces, 1.1, 
+                            3, 0|cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30) );
+
+    // Draw circles around the faces
+    for ( size_t i = 0; i < faces.size(); i++ )
+    {
+        cv::Rect r = faces[i];
+        cv::Mat smallImgROI;
+        std::vector<cv::Rect> nestedObjects;
+        cv::Point center;
+        cv::Scalar color = cv::Scalar(255, 0, 0); // Color for Drawing tool
+        int radius;
+
+        double aspect_ratio = (double)r.width/r.height;
+
+        r.x = r.x - (r.width * (sqrt(zoom_out_rec_scale) - 1) / 2);
+        r.y = r.y - (r.height * (sqrt(zoom_out_rec_scale) - 1) / 2);
+        r.width = r.width * sqrt(zoom_out_rec_scale);
+        r.height = r.height * sqrt(zoom_out_rec_scale);
+
+        rectangle(frame, 
+                  cv::Point(cvRound(r.x*scale), cvRound(r.y*scale)),
+                  cv::Point(cvRound((r.x + r.width-1)*scale), cvRound((r.y + r.height-1)*scale)), 
+                  color, 3, 8, 0);
+        
+    }
 }
