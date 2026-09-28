@@ -9,21 +9,16 @@
     3. Does the metadata output have to be in the frame itself (bounding boxes) 
         or in the console or in a side debug pane, or whatever combination of these I pick?
     
-    4. What is the maximum source FPS the pipeline should support 
-        (I expect <= 30, streaming my webcam seems to be limited to 30 fps, 
-            RTSP streams online are also listed with this value)?
+    4. Should the pipeline keep a constant throughput of ~25 fps and what should be the maximum
+        input source resolution for which this is achieved? 
+        Or its up to me to make practical design choices in that respect?
     
-    5. If a frame is dropped, and I keep showing the last frame with a debug message,
+    5. If a frame is dropped (or I simulate one to be), and I keep showing the last frame with a debug message,
         would that be considered proper handling?
-
-    6. Using my webcam as a source seems to require a different GStreamer element type
-        per OS? In order to achieve more platform independent implementation, can I just
-        detect the platform OS at runtime and select the proper element factory, or it is
-        more preferable to avoid connecting to the camera directly and expose it through
-        a local RTSP server that is platform-independent (i.e. in Python).
-
-    7. It is preferable to use as few 3rd party libs for the core functions as I can,
-        but can I assume that does not include the FR model and inference framework like OpenCV and GLib?
     
-    8. Should I prepare a test environment for the final meeting where I can simulate input changes or 
+    6. Is it desirable that I implement all image operations like greyscale and classification myself in 
+        order to be less dependent on 3rd party libraries in general and in order to redesign them for GPU acceleration?
+        Instead of relying on a 3rd party (i.e. OpenCV, Dlib) implementation?
+    
+    7. Should I prepare a test environment for the final meeting where I can simulate input changes or 
         errors and show how well the pipeline handles them?
