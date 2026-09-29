@@ -5,6 +5,7 @@
 
 #include "debug.h"
 #include "fr_transformer.hpp"
+#include "json_util.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -18,6 +19,20 @@ int main(int argc, char *argv[])
   if (!gst_element_register(nullptr, "fr-transformer", GST_RANK_NONE, GST_TYPE_FR_TRANSFORMER))
   {
     std::cerr << "Failed to register myprocess element" << std::endl;
+    return 1;
+  }
+
+  if (argc < 2)
+  {
+    std::cerr << "Not enough arguments. Format is <app> <input-face-embeddings-file>" << std::endl;
+    return 1;
+  }
+
+  auto face_embeddings = parse_json_embeddings(std::string(argv[1]));
+
+  if (face_embeddings.empty())
+  {
+    std::cerr << "Parsing JSON embeddings failed. Stopping!" << std::endl;
     return 1;
   }
 

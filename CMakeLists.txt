@@ -8,11 +8,12 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GS REQUIRED gstreamer-1.0)
 pkg_check_modules(GS_VIDEO REQUIRED gstreamer-video-1.0)
 pkg_check_modules(OCV REQUIRED opencv4)
+pkg_check_modules(JSONCPP REQUIRED jsoncpp)
 
-add_executable(facial-recog-pipeline main.cpp fr_transformer.cpp debug.cpp)
+add_executable(facial-recog-pipeline main.cpp fr_transformer.cpp debug.cpp json_util.cpp)
 
-target_include_directories(facial-recog-pipeline PUBLIC ${GS_INCLUDE_DIRS} ${GS_VIDEO_INCLUDE_DIRS} ${OCV_INCLUDE_DIRS})
-target_link_libraries(facial-recog-pipeline ${GS_LIBRARIES} ${GS_VIDEO_LIBRARIES} ${OCV_LIBRARIES})
+target_include_directories(facial-recog-pipeline PUBLIC ${GS_INCLUDE_DIRS} ${GS_VIDEO_INCLUDE_DIRS} ${OCV_INCLUDE_DIRS} ${JSONCPP_INCLUDE_DIRS})
+target_link_libraries(facial-recog-pipeline ${GS_LIBRARIES} ${GS_VIDEO_LIBRARIES} ${OCV_LIBRARIES} ${JSONCPP_LIBRARIES})
 target_compile_options(facial-recog-pipeline PUBLIC ${GS_CFLAGS_OTHER} ${GS_VIDEO_CFLAGS_OTHER} ${OCV_CFLAGS_OTHER})
 
 
