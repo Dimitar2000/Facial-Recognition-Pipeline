@@ -1,7 +1,7 @@
 from imutils import paths
 import face_recognition
 import argparse
-import pickle
+import json
 import cv2
 import os
 
@@ -18,8 +18,8 @@ args = vars(ap.parse_args())
 print("[INFO] quantifying faces...")
 imagePaths = list(paths.list_images(args["dataset"]))
 # initialize the list of known encodings and known names
-knownEncodings = []
-knownNames = []
+
+out_encodings = dict()
 
 # loop over the image paths
 for (i, imagePath) in enumerate(imagePaths):
@@ -39,17 +39,14 @@ for (i, imagePath) in enumerate(imagePaths):
 	# compute the facial embedding for the face
 	encodings = face_recognition.face_encodings(rgb, boxes)
 	# loop over the encodings
-	for encoding in encodings:
-		# add each encoding + name to our set of known names and
-		# encodings
-		knownEncodings.append(encoding)
-		knownNames.append(name)
 
+	if out_encodings.get(name) is None:
+		out_encodings[name] = []
+	
+	out_encodings[name].extend(map(list, encodings))
+    
 # dump the facial encodings + names to disk
 print("[INFO] serializing encodings...")
-data = {"encodings": knownEncodings, "names": knownNames}
-f = open(args["encodings"], "wb")
-f.write(pickle.dumps(data))
-f.close()
 
-	
+with open(args["encodings"], "w", encoding='utf-8') as f:
+    json.dump(out_encodings, f, ensure_ascii=False, indent=4)
