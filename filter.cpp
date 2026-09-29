@@ -4,11 +4,15 @@
 #include "gst/gstclock.h"
 #include "gst/gstelement.h"
 
+#include "gst/video/video-frame.h"
 #include "gst/video/video-info.h"
 #include "opencv2/core/mat.hpp"
 #include "opencv2/core/types.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/objdetect.hpp"
+
+#define RECORD_START(el, b) (b = gst_element_get_current_running_time(el))
+#define RECORD_END(el, b, msg) (g_print("%-20s: %11lu\n", msg, gst_element_get_current_running_time(el) - b))
 
 typedef struct _GstMyFilter {
     GstElement element;
@@ -20,7 +24,7 @@ typedef struct _GstMyFilter {
 G_DEFINE_TYPE (GstMyFilter, gst_my_filter, GST_TYPE_ELEMENT);
 GST_ELEMENT_REGISTER_DEFINE(my_filter, "my-filter", GST_RANK_NONE, GST_TYPE_MY_FILTER);
 
-static void detect_and_bind_box(cv::Mat& frame, cv::CascadeClassifier& cascade, double scale, double zoom_out_rec_scale);
+static void detect_and_bind_box(GstElement * el, cv::Mat& frame, cv::CascadeClassifier& cascade, double scale, double zoom_out_rec_scale);
 
 static void gst_my_filter_class_init(GstMyFilterClass * klass)
 {
@@ -112,7 +116,9 @@ GstFlowReturn gst_my_filter_chain (GstPad *pad, GstObject *parent, GstBuffer *bu
     GstMyFilter *filter = GST_MY_FILTER (parent);
     GstElement  *filter_el = GST_ELEMENT(parent);
 
-    GstClockTime clock_time_start = gst_element_get_current_running_time(filter_el);
+    GstClockTime clock_time_start;
+
+    RECORD_START(filter_el, clock_time_start);
 
     // Create opencv Map view of the GstBuffer memory    
     GstCaps *caps = gst_pad_get_current_caps(pad);
@@ -145,7 +151,7 @@ GstFlowReturn gst_my_filter_chain (GstPad *pad, GstObject *parent, GstBuffer *bu
                   data,
                   stride);
 
-        detect_and_bind_box(f, filter->classifier, 1, 3);
+        detect_and_bind_box(filter_el, f, filter->classifier, 1, 3);
 
         gst_video_frame_unmap(&frame);
     }
@@ -154,27 +160,42 @@ GstFlowReturn gst_my_filter_chain (GstPad *pad, GstObject *parent, GstBuffer *bu
 
     GstClockTime clock_time_end = gst_element_get_current_running_time(filter_el);
 
-    g_print("Time to detect and draw boxes: %lu\n", clock_time_end - clock_time_start);
+    RECORD_END(filter_el, clock_time_start, "Total");
 
     return gst_pad_push (filter->srcpad, buf);
 }
 
-static void detect_and_bind_box(cv::Mat& frame, cv::CascadeClassifier& cascade, double scale, double zoom_out_rec_scale)
+static void detect_and_bind_box(GstElement * el,
+ cv::Mat& frame, cv::CascadeClassifier& cascade, double scale, double zoom_out_rec_scale)
 {
     std::vector<cv::Rect> faces;
-    cv::Mat gray, smallImg;
-   
-    auto f = frame.clone();
+
+    GstClockTime clock_time_base;
     
-    cvtColor(f, gray, cv::COLOR_RGB2GRAY); // Convert to Gray Scale
+    RECORD_START(el, clock_time_base);
+    cv::Mat gray = frame.clone();
+    RECORD_END(el, clock_time_base, "Frame copy");
+    
+    RECORD_START(el, clock_time_base);
+    cvtColor(gray, gray, cv::COLOR_RGB2GRAY); // Convert to Gray Scale
+    RECORD_END(el, clock_time_base, "Greyscale");
+
+    cv::Mat smallImg;
 
     // Resize the Grayscale Image 
+    RECORD_START(el, clock_time_base);
     resize( gray, smallImg, cv::Size(), 1 / scale, 1 / scale, cv::INTER_LINEAR); 
+    RECORD_END(el, clock_time_base, "Resize");
+
+    RECORD_START(el, clock_time_base);
     equalizeHist( smallImg, smallImg );
+    RECORD_END(el, clock_time_base, "Equalization");
 
     // Detect faces of different sizes using cascade classifier 
+    RECORD_START(el, clock_time_base);
     cascade.detectMultiScale(smallImg, faces, 1.1, 
                             3, 0|cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30) );
+    RECORD_END(el, clock_time_base, "Detection");
 
     // Draw circles around the faces
     for ( size_t i = 0; i < faces.size(); i++ )
