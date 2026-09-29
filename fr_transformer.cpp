@@ -1,4 +1,4 @@
-#include "filter.hpp"
+#include "fr_transformer.hpp"
 
 #include "glib.h"
 #include "gst/gstclock.h"
@@ -14,19 +14,18 @@
 #define RECORD_START(el, b) (b = gst_element_get_current_running_time(el))
 #define RECORD_END(el, b, msg) (g_print("%-20s: %11lu\n", msg, gst_element_get_current_running_time(el) - b))
 
-typedef struct _GstMyFilter {
+typedef struct _GstFRTransformer {
     GstElement element;
     GstPad *sinkpad, *srcpad;
 
     cv::CascadeClassifier classifier; 
-} GstMyFilter;
+} GstFRTransformer;
 
-G_DEFINE_TYPE (GstMyFilter, gst_my_filter, GST_TYPE_ELEMENT);
-GST_ELEMENT_REGISTER_DEFINE(my_filter, "my-filter", GST_RANK_NONE, GST_TYPE_MY_FILTER);
+G_DEFINE_TYPE (GstFRTransformer, gst_fr_transformer, GST_TYPE_ELEMENT);
 
 static void detect_and_bind_box(GstElement * el, cv::Mat& frame, cv::CascadeClassifier& cascade, double scale, double zoom_out_rec_scale);
 
-static void gst_my_filter_class_init(GstMyFilterClass * klass)
+static void gst_fr_transformer_class_init(GstFRTransformerClass * klass)
 {
     GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
@@ -66,7 +65,7 @@ static void gst_my_filter_class_init(GstMyFilterClass * klass)
     gst_caps_unref(caps);
 }
 
-static void gst_my_filter_init (GstMyFilter *filter)
+static void gst_fr_transformer_init (GstFRTransformer *filter)
 {
     GstElementClass * klass = GST_ELEMENT_GET_CLASS(filter);
 
@@ -74,8 +73,8 @@ static void gst_my_filter_init (GstMyFilter *filter)
     filter->sinkpad = gst_pad_new_from_template(gst_element_class_get_pad_template(klass, "sink"), "sink");
 
     /* configure chain function on the pad before adding the pad to the element */
-    gst_pad_set_chain_function (filter->sinkpad, gst_my_filter_chain);
-    gst_pad_set_event_function (filter->sinkpad, gst_my_filter_sink_event);
+    gst_pad_set_chain_function (filter->sinkpad, gst_fr_transformer_chain);
+    gst_pad_set_event_function (filter->sinkpad, gst_fr_transformer_sink_event);
 
     gst_element_add_pad (GST_ELEMENT (filter), filter->sinkpad);
 
@@ -87,10 +86,10 @@ static void gst_my_filter_init (GstMyFilter *filter)
     filter->classifier.load("../haarcascade_frontalcatface.xml") ; 
 }
 
-gboolean gst_my_filter_sink_event (GstPad *pad, GstObject *parent, GstEvent  *event)
+static gboolean gst_fr_transformer_sink_event (GstPad *pad, GstObject *parent, GstEvent  *event)
 {
   gboolean ret;
-  GstMyFilter *filter = GST_MY_FILTER (parent);
+    GstFRTransformer *filter = GST_FR_TRANSFORMER (parent);
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_CAPS:
@@ -111,9 +110,9 @@ gboolean gst_my_filter_sink_event (GstPad *pad, GstObject *parent, GstEvent  *ev
   return ret;
 }
 
-GstFlowReturn gst_my_filter_chain (GstPad *pad, GstObject *parent, GstBuffer *buf)
+GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffer *buf)
 {
-    GstMyFilter *filter = GST_MY_FILTER (parent);
+    GstFRTransformer *filter = GST_FR_TRANSFORMER (parent);
     GstElement  *filter_el = GST_ELEMENT(parent);
 
     GstClockTime clock_time_start;

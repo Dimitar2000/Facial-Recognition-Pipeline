@@ -4,18 +4,18 @@
 #include <gst/audio/audio.h>
 
 #include "debug.h"
-#include "filter.hpp"
+#include "fr_transformer.hpp"
 
 int main(int argc, char *argv[])
 {
-  GstElement *pipeline, *source, *video_convert, *processor, *video_convert2, *sink;
+  GstElement *pipeline, *source, *video_convert, *fr_transformer, *video_convert2, *sink;
   GstBus *bus;
   GstMessage *msg;
 
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
 
-  if (!gst_element_register(nullptr, "myfilter", GST_RANK_NONE, GST_TYPE_MY_FILTER))
+  if (!gst_element_register(nullptr, "fr-transformer", GST_RANK_NONE, GST_TYPE_FR_TRANSFORMER))
   {
     std::cerr << "Failed to register myprocess element" << std::endl;
     return 1;
@@ -24,23 +24,23 @@ int main(int argc, char *argv[])
   /* Create the elements */
   source          = gst_element_factory_make ("v4l2src", "source");
   video_convert   = gst_element_factory_make ("videoconvert", "video_convert");
-  processor       = gst_element_factory_make ("myfilter", "custom_frame_processor");
+  fr_transformer  = gst_element_factory_make ("fr-transformer", "facial-recognition-transformer");
   video_convert2  = gst_element_factory_make ("videoconvert", "video_convert_2");
   sink            = gst_element_factory_make ("autovideosink", "sink");
 
   /* Create the empty pipeline */
   pipeline = gst_pipeline_new ("test-pipeline");
 
-  if (!pipeline || !source || !video_convert || !processor || !video_convert2 || !sink)
+  if (!pipeline || !source || !video_convert || !fr_transformer || !video_convert2 || !sink)
   {
     g_printerr ("Not all elements could be created.\n");
     return -1;
   }
 
   /* Link all elements that can be automatically linked because they have "Always" pads */
-  gst_bin_add_many (GST_BIN (pipeline), source, video_convert, processor, video_convert2, sink, NULL);
+  gst_bin_add_many (GST_BIN (pipeline), source, video_convert, fr_transformer, video_convert2, sink, NULL);
   
-  if (gst_element_link_many (source, video_convert, processor, video_convert2, sink, NULL) != TRUE) {
+  if (gst_element_link_many (source, video_convert, fr_transformer, video_convert2, sink, NULL) != TRUE) {
     g_printerr ("Elements could not be linked.\n");
     gst_object_unref (pipeline);
     return -1;
