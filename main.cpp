@@ -1,4 +1,7 @@
 #include <exception>
+#include <glib-object.h>
+#include <gst/gstelementfactory.h>
+#include <gst/gstobject.h>
 #include <iostream>
 
 #include <gst/gst.h>
@@ -12,7 +15,7 @@
 
 int main(int argc, char *argv[])
 {
-  GstElement *pipeline, *source, *video_convert, *fr_transformer, *video_convert2, *sink;
+  GstElement *pipeline, *source, *caps_filter, *mjpeg, *video_convert, *fr_transformer, *video_convert2, *sink;
   GstBus *bus;
   GstMessage *msg;
 
@@ -65,10 +68,29 @@ int main(int argc, char *argv[])
 
   /* Create the elements */
   source          = gst_element_factory_make ("v4l2src", "source");
+  caps_filter     = gst_element_factory_make ("capsfilter", "resolution");
+  mjpeg           = gst_element_factory_make ("jpegdec", "jpeg decoder");
   video_convert   = gst_element_factory_make ("videoconvert", "video_convert");
   fr_transformer  = gst_element_factory_make ("fr-transformer", "facial-recognition-transformer");
   video_convert2  = gst_element_factory_make ("videoconvert", "video_convert_2");
   sink            = gst_element_factory_make ("autovideosink", "sink");
+
+  /* Create the empty pipeline */
+  pipeline = gst_pipeline_new ("test-pipeline");
+
+  if (!pipeline || !source || !caps_filter || !mjpeg || !video_convert || !fr_transformer || !video_convert2 || !sink)
+  {
+    g_printerr ("Not all elements could be created.\n");
+    return -1;
+  }
+
+  GstCaps* caps = gst_caps_new_simple("image/jpeg", 
+                                      "width", G_TYPE_INT, 1920,
+                                      "height", G_TYPE_INT, 1080,
+                                      NULL);
+
+  g_object_set(caps_filter, "caps", caps, NULL);
+  gst_caps_unref(caps);  
 
   gst_fr_transformer_set_data(
     GST_FR_TRANSFORMER(fr_transformer),
@@ -77,19 +99,10 @@ int main(int argc, char *argv[])
     std::move(face_dataset)
   );
 
-  /* Create the empty pipeline */
-  pipeline = gst_pipeline_new ("test-pipeline");
-
-  if (!pipeline || !source || !video_convert || !fr_transformer || !video_convert2 || !sink)
-  {
-    g_printerr ("Not all elements could be created.\n");
-    return -1;
-  }
-
   /* Link all elements that can be automatically linked because they have "Always" pads */
-  gst_bin_add_many (GST_BIN (pipeline), source, video_convert, fr_transformer, video_convert2, sink, NULL);
+  gst_bin_add_many (GST_BIN (pipeline), source, caps_filter, mjpeg, video_convert, fr_transformer, video_convert2, sink, NULL);
   
-  if (gst_element_link_many (source, video_convert, fr_transformer, video_convert2, sink, NULL) != TRUE) {
+  if (gst_element_link_many (source, caps_filter, mjpeg, video_convert, fr_transformer, video_convert2, sink, NULL) != TRUE) {
     g_printerr ("Elements could not be linked.\n");
     gst_object_unref (pipeline);
     return -1;
