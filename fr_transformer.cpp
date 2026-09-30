@@ -244,8 +244,11 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
         RECORD_END(el, clock_time_base, "Embedding");
 
         int best_matches            = 0;
-        double best_match_min       = 0;
-        double best_match_max       = 0;
+        int best_matches_num_imgs   = 0;
+        double best_match_min       = MAXFLOAT;
+         double best_match_max       = 0;
+        double min                  = MAXFLOAT;
+        double max                  = 0;
         std::string best_match_name = "Unknown";
 
         RECORD_START(el, clock_time_base);
@@ -261,18 +264,22 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
                                                                         ref_embedding,
                                                                         cv::FaceRecognizerSF::FR_COSINE);
 
-                if (similarity >= 0.75)
+                if (similarity >= 0.5)
                 {
                     matches++;
 
                     if (similarity > match_max) match_max = similarity;
                     if (similarity < match_min) match_min = similarity;
                 }
+
+                if (similarity > max) max = similarity;
+                if (similarity < min) min = similarity;
             }
 
             if (matches > best_matches)
             {
                 best_matches = matches;
+                best_matches_num_imgs = ref_embeddings.size();
                 best_match_name = name;
                 best_match_max = match_max;
                 best_match_min = match_min;
@@ -300,15 +307,21 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
                       face_scaled_rect,
                       cv::Scalar(0, 255, 0), 2);
 
-        gchar* box_label = g_strdup_printf("%s: (%.3g, %.3g)", best_match_name.c_str(), best_match_min, best_match_max);
+        std::vector<gchar *> metadata_lines = {
+            g_strdup_printf("%s", best_match_name.c_str()),
+            g_strdup_printf("%i/%i", best_matches, best_matches_num_imgs),
+            g_strdup_printf("(%.3g, %.3g)", best_matches ? best_match_min : min, best_matches ? best_match_max : max),
+        };
 
-        cv::putText(frame,
-                    box_label,
-                    cv::Point2d(static_cast<int>(face_scaled_rect.x), static_cast<int>(face_scaled_rect.y - 2)),
+        for (int i = 0; i < metadata_lines.size(); i++)
+        {
+            cv::putText(frame, metadata_lines[i],
+                    cv::Point2d(static_cast<int>(face_scaled_rect.x), static_cast<int>(face_scaled_rect.y - i * 40)),
                     cv::FONT_HERSHEY_PLAIN,
-                    4, {255, 0, 0}, 2);
-        
-        g_free(box_label);
+                    3, {255, 0, 0}, 2);
+
+            g_free(metadata_lines[i]);
+        }
     }
 
 }
