@@ -1,8 +1,8 @@
-#include <exception>
 #include <gst/gstelement.h>
 #include <gst/gstobject.h>
 #include <gst/gstpipeline.h>
 #include <gst/gstutils.h>
+#include <stdexcept>
 #include <string>
 
 #include "fr_transformer.hpp"
@@ -36,7 +36,6 @@ class FRPipeline
                         debug_info ? debug_info : "none");
                     g_clear_error (&err);
                     g_free (debug_info);
-
                     break;
                 case GST_MESSAGE_EOS:
                     g_print ("End-Of-Stream reached.\n");
@@ -59,7 +58,10 @@ class FRPipeline
         virtual ~FRPipeline()
         {
             /* Free resources */
-            gst_object_unref (pipeline);
+            if (pipeline)
+            {
+                gst_object_unref (pipeline);
+            }
         }
 
     protected:
@@ -69,20 +71,33 @@ class FRPipeline
                    std::string yunet_model_file_path, 
                    std::string sface_model_file_path)
         {
+            /* Create the empty pipeline */
+            pipeline = gst_pipeline_new ("webcam-pipeline");
+
+            if (!pipeline)
+            {
+                g_printerr ("Pipeline could not be created by GStreamer.\n");
+                throw std::runtime_error("Pipeline could not be created by GStreamer");
+            }
+
             // Create the common elements
             video_convert   = gst_element_factory_make ("videoconvert", "video_convert");
             fr_transformer  = gst_element_factory_make ("fr-transformer", "facial-recognition-transformer");
             video_convert2  = gst_element_factory_make ("videoconvert", "video_convert_2");
             sink            = gst_element_factory_make ("autovideosink", "sink");
 
-            /* Create the empty pipeline */
-            pipeline = gst_pipeline_new ("webcam-pipeline");
-
-            if (!pipeline || !video_convert || !fr_transformer || !video_convert2 || !sink)
+            if (!video_convert || !fr_transformer || !video_convert2 || !sink)
             {
-                g_printerr ("Not all elements could be created.\n");                
+                g_printerr ("Not all elements could be created.\n");
+                if (video_convert) gst_object_unref (video_convert);
+                if (fr_transformer) gst_object_unref (fr_transformer);
+                if (video_convert2) gst_object_unref (video_convert2);
+                if (sink) gst_object_unref (sink);
+
                 gst_object_unref (pipeline);
-                throw std::exception();
+                pipeline = nullptr;
+
+                throw std::runtime_error("Pipeline elements could not be created");
             }
 
             gst_fr_transformer_set_data(GST_FR_TRANSFORMER(fr_transformer),
@@ -96,7 +111,8 @@ class FRPipeline
             if (gst_element_link_many (video_convert, fr_transformer, video_convert2, sink, NULL) != TRUE) {
                 g_printerr ("Elements could not be linked.\n");
                 gst_object_unref (pipeline);
-                return;
+                pipeline = nullptr;
+                throw std::runtime_error("Pipeline elements could not be linked");
             }
         }
 
@@ -109,7 +125,11 @@ class FRPipeline
         }
 
     protected:
-        GstElement *pipeline, *mjpeg, *video_convert, *fr_transformer, *video_convert2, *sink;
+        GstElement *pipeline = nullptr;
+        GstElement *video_convert = nullptr;
+        GstElement *fr_transformer = nullptr;
+        GstElement *video_convert2 = nullptr;
+        GstElement *sink = nullptr;
 };
 
 class WebcamFRPipeline: public FRPipeline
@@ -129,7 +149,23 @@ class WebcamFRPipeline: public FRPipeline
             if (!source || !caps_filter || !mjpeg)
             {
                 g_printerr ("Not all elements could be created.\n");
-                return;
+                
+                if (source) 
+                {
+                    gst_object_unref (source);
+                }
+                
+                if (caps_filter)
+                {
+                    gst_object_unref (caps_filter);
+                }
+
+                if (mjpeg) 
+                {
+                    gst_object_unref (mjpeg);
+                }
+
+                throw std::runtime_error("Webcam pipeline elements could not be created");
             }
 
             // Set required camera frame format and resolution
@@ -143,17 +179,19 @@ class WebcamFRPipeline: public FRPipeline
             /* Link all elements that can be automatically linked because they have "Always" pads */
             gst_bin_add_many (GST_BIN (get_pipeline()), source, caps_filter, mjpeg, NULL);
             
-            if (gst_element_link_many (source, caps_filter, mjpeg, get_source(), NULL) != TRUE) {
+            if (gst_element_link_many (source, caps_filter, mjpeg, get_source(), NULL) != TRUE)
+            {
                 g_printerr ("Elements could not be linked.\n");
-                gst_object_unref (get_pipeline());
-                return;
+                throw std::runtime_error("Webcam pipeline elements could not be linked");
             }
         }
 
         ~WebcamFRPipeline() = default;
 
     private:
-        GstElement *source, *caps_filter, *mjpeg;
+        GstElement *source = nullptr;
+        GstElement *caps_filter = nullptr;
+        GstElement *mjpeg = nullptr;
 };
 
 class MP4FRPipeline: public FRPipeline
@@ -173,7 +211,9 @@ class MP4FRPipeline: public FRPipeline
             if (!source || !decoder)
             {
                 g_printerr ("Not all elements could be created.\n");
-                return;
+                if (source) gst_object_unref (source);
+                if (decoder) gst_object_unref (decoder);
+                throw std::runtime_error("MP4 pipeline elements could not be created");
             }
 
             // Set input MP4 video file location for streaming 
@@ -182,10 +222,10 @@ class MP4FRPipeline: public FRPipeline
             /* Link all elements that can be automatically linked because they have "Always" pads */
             gst_bin_add_many (GST_BIN (get_pipeline()), source, decoder, NULL);
             
-            if (gst_element_link_many (source, decoder, NULL) != TRUE) {
+            if (gst_element_link_many (source, decoder, NULL) != TRUE) 
+            {
                 g_printerr ("Elements could not be linked.\n");
-                gst_object_unref (get_pipeline());
-                return;
+                throw std::runtime_error("MP4 pipeline elements could not be linked");
             }
 
             g_signal_connect(decoder, "pad-added", G_CALLBACK(MP4FRPipeline::on_decodebin_pad_added), video_convert);
@@ -223,7 +263,7 @@ class MP4FRPipeline: public FRPipeline
                 GstPadLinkReturn result = gst_pad_link(new_pad, sink_pad);
                 if (result != GST_PAD_LINK_OK)
                 {
-                g_printerr("Could not link decoded video pad (error %d).\n", result);
+                    g_printerr("Could not link decoded video pad (error %d).\n", result);
                 }
             }
 
@@ -235,5 +275,6 @@ class MP4FRPipeline: public FRPipeline
         }
     
     private:
-        GstElement *source, *decoder;
+        GstElement *source = nullptr;
+        GstElement *decoder = nullptr;
 };
