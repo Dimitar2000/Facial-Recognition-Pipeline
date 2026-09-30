@@ -51,7 +51,7 @@ static void on_decodebin_pad_added(GstElement *, GstPad *new_pad, gpointer user_
   gst_object_unref(sink_pad);
 }
 
-bool create_webcam_pipeline(std::string face_dataset_data_path)
+bool create_webcam_pipeline(std::string face_dataset_file_path, std::string yunet_model_file_path, std::string sface_model_file_path)
 {
   GstElement *pipeline, *source, *caps_filter, *mjpeg, *video_convert, *fr_transformer, *video_convert2, *sink;
   GstBus *bus;
@@ -59,7 +59,7 @@ bool create_webcam_pipeline(std::string face_dataset_data_path)
 
   std::vector<FaceEmbeddings> face_dataset;
   
-  face_dataset = parse_yaml_embeddings(face_dataset_data_path);
+  face_dataset = parse_yaml_embeddings(face_dataset_file_path);
 
   if (face_dataset.empty())
   {
@@ -68,13 +68,13 @@ bool create_webcam_pipeline(std::string face_dataset_data_path)
   }
 
   auto face_detector = cv::FaceDetectorYN::create(
-        "../models/face_detection_yunet_2023mar.onnx",
+        yunet_model_file_path,
         "",
         cv::Size(320, 320)
   );
 
   auto face_recogniser = cv::FaceRecognizerSF::create(
-        "../models/face_recognition_sface_2021dec.onnx",
+        sface_model_file_path,
         ""
   );
 
@@ -162,7 +162,7 @@ bool create_webcam_pipeline(std::string face_dataset_data_path)
   return 0;
 }
 
-bool create_mp4_pipeline(std::string input_mp4_file_path, std::string face_dataset_data_path)
+bool create_mp4_pipeline(std::string input_mp4_file_path, std::string yunet_model_file_path, std::string sface_model_file_path, std::string face_dataset_data_path)
 {
   GstElement *pipeline, *source, *decoder, *video_convert, *fr_transformer, *video_convert2, *sink;
   GstBus *bus;
@@ -179,13 +179,13 @@ bool create_mp4_pipeline(std::string input_mp4_file_path, std::string face_datas
   }
 
   auto face_detector = cv::FaceDetectorYN::create(
-        "../models/face_detection_yunet_2023mar.onnx",
+        yunet_model_file_path,
         "",
         cv::Size(320, 320)
   );
 
   auto face_recogniser = cv::FaceRecognizerSF::create(
-        "../models/face_recognition_sface_2021dec.onnx",
+        sface_model_file_path,
         ""
   );
 
@@ -282,16 +282,18 @@ int main(int argc, char *argv[])
   }
 
   // Parse arguments
-  if (argc < 3)
+  if (argc < 5)
   {
     std::cerr << "Not enough arguments. Format is: \n"
-              << "  <app> webcam <input-face-embeddings-file-path>\n"
-              << "  <app> mp4    <input-face-embeddings-file-path> <input-mp4-file-path>" << std::endl;
+              << "  <app> webcam <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path>\n"
+              << "  <app> mp4    <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path> <input-mp4-file-path>" << std::endl;
     return 1;
   }
 
   std::string source_type            = argv[1];
   std::string face_dataset_file_path = argv[2];
+  std::string yunet_model_file_path  = argv[3];
+  std::string sface_model_file_path  = argv[4];
 
   bool error = false;
 
@@ -299,22 +301,22 @@ int main(int argc, char *argv[])
   {
     std::cout << "Source type is: Camera" << std::endl;
 
-    error = create_webcam_pipeline(face_dataset_file_path);
+    error = create_webcam_pipeline(face_dataset_file_path, yunet_model_file_path, sface_model_file_path);
   }
   else if (source_type == "mp4")
   {
     std::cout << "Source type is: MP4 video file" << std::endl;
 
     // Parse arguments
-    if (argc < 4)
+    if (argc < 6)
     {
-      std::cerr << "Not enough arguments. Format is <app> mp4 <input-face-embeddings-file-path> <input-mp4-file-path>" << std::endl;
+      std::cerr << "Not enough arguments. Format is <app> mp4 <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path> <input-mp4-file-path>" << std::endl;
       return 1;
     }
 
-    std::string input_mp4_file_path = argv[3];
+    std::string input_mp4_file_path = argv[5];
 
-    error = create_mp4_pipeline(input_mp4_file_path, face_dataset_file_path);
+    error = create_mp4_pipeline(input_mp4_file_path, yunet_model_file_path, sface_model_file_path, face_dataset_file_path);
   }
   else
   {
