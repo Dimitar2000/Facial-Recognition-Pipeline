@@ -28,7 +28,7 @@ typedef struct _GstFRTransformer {
 
 G_DEFINE_TYPE (GstFRTransformer, gst_fr_transformer, GST_TYPE_ELEMENT);
 
-static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame);
+static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, cv::Size scaled_size);
 
 static void gst_fr_transformer_class_init(GstFRTransformerClass * klass)
 {
@@ -162,7 +162,7 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
                   data,
                   stride);
 
-        detect_and_bind_box(transformer, f);
+        detect_and_bind_box(transformer, f, {1024, 576});
 
         gst_video_frame_unmap(&frame);
     }
@@ -177,19 +177,25 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
     return gst_pad_push (transformer->srcpad, buf);
 }
 
-static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame)
+static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, cv::Size scaled_size)
 {
     GstElement  *el = GST_ELEMENT(transformer);
     GstClockTime clock_time_base;
 
+    cv::Size original_size = {frame.cols, frame.rows};
+    cv::Mat scaled_frame;
     cv::Mat faces;
 
     RECORD_START(el, clock_time_base);
-    transformer->face_detector->setInputSize(frame.size());
+    cv::resize(frame, scaled_frame, scaled_size);
+    RECORD_END(el, clock_time_base, "Rescaling");
+
+    RECORD_START(el, clock_time_base);
+    transformer->face_detector->setInputSize(scaled_frame.size());
     RECORD_END(el, clock_time_base, "Setting input size");
 
     RECORD_START(el, clock_time_base);
-    transformer->face_detector->detect(frame, faces);
+    transformer->face_detector->detect(scaled_frame, faces);
     RECORD_END(el, clock_time_base, "Detection");
 
     if (faces.empty())
@@ -205,7 +211,7 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame)
         cv::Mat embedding;
 
         RECORD_START(el, clock_time_base);
-        transformer->face_recogniser->alignCrop(frame, 
+        transformer->face_recogniser->alignCrop(scaled_frame, 
                                                 face,
                                                 aligned_face);
         RECORD_END(el, clock_time_base, "Alignment");
@@ -250,14 +256,23 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame)
         float width  = face.at<float>(0, 2);
         float height = face.at<float>(0, 3);
 
+        double sx = static_cast<double>(original_size.width) / scaled_size.width;
+        double sy = static_cast<double>(original_size.height) / scaled_size.height;
+
+        cv::Rect face_scaled_rect(
+            cvRound(x * sx),
+            cvRound(y * sy),
+            cvRound(width * sx),
+            cvRound(height * sy)
+        );
+
         cv::rectangle(frame,
-                      cv::Rect(static_cast<int>(x), static_cast<int>(y),
-                               static_cast<int>(width),
-                               static_cast<int>(height)),
+                      face_scaled_rect,
                       cv::Scalar(0, 255, 0), 2);
+
         cv::putText(frame,
                     best_match_name,
-                    cv::Point2d(static_cast<int>(x), static_cast<int>(y - 2)),
+                    cv::Point2d(static_cast<int>(face_scaled_rect.x), static_cast<int>(face_scaled_rect.y - 2)),
                     cv::FONT_HERSHEY_PLAIN,
                     1, {255, 0, 0}, 2);
     }
