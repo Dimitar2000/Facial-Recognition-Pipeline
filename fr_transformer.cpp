@@ -10,6 +10,8 @@
 #include "opencv2/core/types.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/objdetect.hpp"
+#include "yaml_util.hpp"
+#include <opencv2/objdetect/face.hpp>
 
 #define RECORD_START(el, b) (b = gst_element_get_current_running_time(el))
 #define RECORD_END(el, b, msg) (g_print("%-20s: %11lu\n", msg, gst_element_get_current_running_time(el) - b))
@@ -18,12 +20,14 @@ typedef struct _GstFRTransformer {
     GstElement element;
     GstPad *sinkpad, *srcpad;
 
-    cv::CascadeClassifier classifier; 
+    cv::Ptr<cv::FaceDetectorYN> face_detector;
+    cv::Ptr<cv::FaceRecognizerSF> face_recogniser;
+    std::vector<FaceEmbeddings> face_database;
 } GstFRTransformer;
 
 G_DEFINE_TYPE (GstFRTransformer, gst_fr_transformer, GST_TYPE_ELEMENT);
 
-static void detect_and_bind_box(GstElement * el, cv::Mat& frame, cv::CascadeClassifier& cascade, double scale, double zoom_out_rec_scale);
+static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame);
 
 static void gst_fr_transformer_class_init(GstFRTransformerClass * klass)
 {
@@ -81,12 +85,19 @@ static void gst_fr_transformer_init (GstFRTransformer *filter)
     /* pad through which data goes out of the element */
     filter->srcpad = gst_pad_new_from_template(gst_element_class_get_pad_template(klass, "src"), "src");
     gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
-
-    // Load classifiers from &quot;opencv/data/haarcascades&quot; directory 
-    filter->classifier.load("../haarcascade_frontalcatface.xml") ; 
 }
 
-static gboolean gst_fr_transformer_sink_event (GstPad *pad, GstObject *parent, GstEvent  *event)
+void gst_fr_transformer_set_data(GstFRTransformer * transformer,
+                                 cv::Ptr<cv::FaceDetectorYN>&& face_detector,
+                                 cv::Ptr<cv::FaceRecognizerSF>&& face_recogniser,
+                                 std::vector<FaceEmbeddings>&& face_database)
+{
+    transformer->face_detector = face_detector;
+    transformer->face_recogniser = face_recogniser;
+    transformer->face_database = face_database;
+}
+
+gboolean gst_fr_transformer_sink_event (GstPad *pad, GstObject *parent, GstEvent  *event)
 {
   gboolean ret;
     GstFRTransformer *filter = GST_FR_TRANSFORMER (parent);
@@ -112,19 +123,19 @@ static gboolean gst_fr_transformer_sink_event (GstPad *pad, GstObject *parent, G
 
 GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffer *buf)
 {
-    GstFRTransformer *filter = GST_FR_TRANSFORMER (parent);
-    GstElement  *filter_el = GST_ELEMENT(parent);
+    GstFRTransformer *transformer    = GST_FR_TRANSFORMER (parent);
+    GstElement       *transformer_el = GST_ELEMENT(parent);
 
     GstClockTime clock_time_start;
 
-    RECORD_START(filter_el, clock_time_start);
+    RECORD_START(transformer_el, clock_time_start);
 
     // Create opencv Map view of the GstBuffer memory    
     GstCaps *caps = gst_pad_get_current_caps(pad);
 
     if (!caps)
     {
-        return gst_pad_push (filter->srcpad, buf);
+        return gst_pad_push (transformer->srcpad, buf);
     }
 
     GstVideoInfo info;
@@ -150,66 +161,67 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
                   data,
                   stride);
 
-        detect_and_bind_box(filter_el, f, filter->classifier, 1, 3);
+        detect_and_bind_box(transformer, f);
 
         gst_video_frame_unmap(&frame);
     }
 
     gst_caps_unref(caps);
 
-    GstClockTime clock_time_end = gst_element_get_current_running_time(filter_el);
+    GstClockTime clock_time_end = gst_element_get_current_running_time(transformer_el);
 
-    RECORD_END(filter_el, clock_time_start, "Total");
+    RECORD_END(transformer_el, clock_time_start, "Total");
 
-    return gst_pad_push (filter->srcpad, buf);
+    return gst_pad_push (transformer->srcpad, buf);
 }
 
-static void detect_and_bind_box(GstElement * el,
- cv::Mat& frame, cv::CascadeClassifier& cascade, double scale, double zoom_out_rec_scale)
+static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame)
 {
+    GstElement       *el = GST_ELEMENT(transformer);
+
     std::vector<cv::Rect> faces;
 
-    GstClockTime clock_time_base;
+    // GstClockTime clock_time_base;
     
-    RECORD_START(el, clock_time_base);
-    cv::Mat gray = frame.clone();
-    RECORD_END(el, clock_time_base, "Frame copy");
+    // RECORD_START(el, clock_time_base);
+    // cv::Mat gray = frame.clone();
+    // RECORD_END(el, clock_time_base, "Frame copy");
     
-    RECORD_START(el, clock_time_base);
-    cvtColor(gray, gray, cv::COLOR_RGB2GRAY); // Convert to Gray Scale
-    RECORD_END(el, clock_time_base, "Greyscale");
+    // RECORD_START(el, clock_time_base);
+    // cvtColor(gray, gray, cv::COLOR_RGB2GRAY); // Convert to Gray Scale
+    // RECORD_END(el, clock_time_base, "Greyscale");
 
-    cv::Mat smallImg;
+    // cv::Mat smallImg;
 
-    // Resize the Grayscale Image 
-    RECORD_START(el, clock_time_base);
-    resize( gray, smallImg, cv::Size(), 1 / scale, 1 / scale, cv::INTER_LINEAR); 
-    RECORD_END(el, clock_time_base, "Resize");
+    // // Resize the Grayscale Image 
+    // RECORD_START(el, clock_time_base);
+    // resize( gray, smallImg, cv::Size(), 1, 1 , cv::INTER_LINEAR); 
+    // RECORD_END(el, clock_time_base, "Resize");
 
-    RECORD_START(el, clock_time_base);
-    equalizeHist( smallImg, smallImg );
-    RECORD_END(el, clock_time_base, "Equalization");
+    // RECORD_START(el, clock_time_base);
+    // equalizeHist( smallImg, smallImg );
+    // RECORD_END(el, clock_time_base, "Equalization");
 
-    // Detect faces of different sizes using cascade classifier 
-    RECORD_START(el, clock_time_base);
-    cascade.detectMultiScale(smallImg, faces, 1.1, 
-                            3, 0|cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30) );
-    RECORD_END(el, clock_time_base, "Detection");
+    // // Detect faces of different sizes using cascade classifier 
+    // RECORD_START(el, clock_time_base);
+    // cascade.detectMultiScale(smallImg, faces, 1.1, 
+    //                         3, 0|cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30) );
+    // RECORD_END(el, clock_time_base, "Detection");
 
-    // Draw circles around the faces
-    for ( size_t i = 0; i < faces.size(); i++ )
-    {
-        cv::Rect r = faces[i];
-        cv::Scalar color = cv::Scalar(255, 0, 0); // Color for Drawing tool
+    // // Draw circles around the faces
+    // for ( size_t i = 0; i < faces.size(); i++ )
+    // {
+    //     cv::Rect r = faces[i];
+    //     cv::Scalar color = cv::Scalar(255, 0, 0); // Color for Drawing tool
 
-        r.x = r.x - (r.width * (sqrt(zoom_out_rec_scale) - 1) / 2);
-        r.y = r.y - (r.height * (sqrt(zoom_out_rec_scale) - 1) / 2);
-        r.width = r.width * sqrt(zoom_out_rec_scale);
-        r.height = r.height * sqrt(zoom_out_rec_scale);
+    //     r.x = r.x - (r.width * (sqrt(zoom_out_rec_scale) - 1) / 2);
+    //     r.y = r.y - (r.height * (sqrt(zoom_out_rec_scale) - 1) / 2);
+    //     r.width = r.width * sqrt(zoom_out_rec_scale);
+    //     r.height = r.height * sqrt(zoom_out_rec_scale);
 
-        rectangle(frame, 
-                  cv::Point(cvRound(r.x*scale), cvRound(r.y*scale)),
-                  cv::Point(cvRound((r.x + r.width-1)*scale), cvRound((r.y + r.height-1)*scale)), 
-                  color, 3, 8, 0);
-    }
+    //     rectangle(frame, 
+    //               cv::Point(cvRound(r.x*scale), cvRound(r.y*scale)),
+    //               cv::Point(cvRound((r.x + r.width-1)*scale), cvRound((r.y + r.height-1)*scale)), 
+    //               color, 3, 8, 0);
+    // }
 }

@@ -3,6 +3,7 @@
 
 #include <gst/gst.h>
 #include <gst/audio/audio.h>
+#include <opencv2/objdetect/face.hpp>
 #include <vector>
 
 #include "debug.h"
@@ -30,11 +31,11 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  std::vector<FaceEmbeddings> face_embeddings;
+  std::vector<FaceEmbeddings> face_dataset;
   
   try 
   {
-    face_embeddings = parse_yaml_embeddings(std::string(argv[1]));
+    face_dataset = parse_yaml_embeddings(std::string(argv[1]));
   }
   catch (std::exception e)
   {
@@ -43,11 +44,24 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  if (face_embeddings.empty())
+  if (face_dataset.empty())
   {
     std::cerr << "No embeddings were found!" << std::endl;
     return 1;
   }
+
+  auto face_detector = cv::FaceDetectorYN::create(
+        "../models/face_detection_yunet_2023mar.onnx",
+        "",
+        cv::Size(320, 320)
+  );
+
+  auto face_recogniser = cv::FaceRecognizerSF::create(
+        "../models/face_recognition_sface_2021dec.onnx",
+        ""
+  );
+
+  std::cout << "Loading facial recognition models was successful!" << std::endl;
 
   /* Create the elements */
   source          = gst_element_factory_make ("v4l2src", "source");
@@ -55,6 +69,13 @@ int main(int argc, char *argv[])
   fr_transformer  = gst_element_factory_make ("fr-transformer", "facial-recognition-transformer");
   video_convert2  = gst_element_factory_make ("videoconvert", "video_convert_2");
   sink            = gst_element_factory_make ("autovideosink", "sink");
+
+  gst_fr_transformer_set_data(
+    GST_FR_TRANSFORMER(fr_transformer),
+    std::move(face_detector),
+    std::move(face_recogniser),
+    std::move(face_dataset)
+  );
 
   /* Create the empty pipeline */
   pipeline = gst_pipeline_new ("test-pipeline");
