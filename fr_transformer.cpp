@@ -158,7 +158,7 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
                   data,
                   stride);
 
-        detect_and_bind_box(transformer, f, {1920, 1080});
+        detect_and_bind_box(transformer, f, {});
 
         gst_video_frame_unmap(&frame);
     }
@@ -182,9 +182,19 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
     cv::Mat scaled_frame;
     cv::Mat faces;
 
-    RECORD_START(el, clock_time_base);
-    cv::resize(frame, scaled_frame, scaled_size);
-    RECORD_END(el, clock_time_base, "Rescaling");
+    // If the frame does not have to be scaled or it is already smaller
+    //  than the scaled version, just use it without compression
+    if (!scaled_size.empty() && scaled_size.area() < original_size.area())
+    {
+        RECORD_START(el, clock_time_base);
+        cv::resize(frame, scaled_frame, scaled_size);
+        RECORD_END(el, clock_time_base, "Rescaling");
+    }
+    else
+    {
+        scaled_size = original_size;
+        scaled_frame = frame;
+    }
 
     RECORD_START(el, clock_time_base);
     transformer->face_detector->setInputSize(scaled_frame.size());
@@ -270,7 +280,7 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
                     best_match_name,
                     cv::Point2d(static_cast<int>(face_scaled_rect.x), static_cast<int>(face_scaled_rect.y - 2)),
                     cv::FONT_HERSHEY_PLAIN,
-                    (double)original_size.height / scaled_size.height, {255, 0, 0}, 2);
+                    4, {255, 0, 0}, 2);
     }
 
 }
