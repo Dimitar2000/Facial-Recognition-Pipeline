@@ -9,7 +9,6 @@ set(PKG_CONFIG_DEPENDENCIES
 	gstreamer-1.0
 	gstreamer-video-1.0
 	opencv4
-	jsoncpp
 )
 
 set(DEPENDENCY_TARGETS)
@@ -20,7 +19,7 @@ foreach(dependency IN LISTS PKG_CONFIG_DEPENDENCIES)
 	list(APPEND DEPENDENCY_TARGETS PkgConfig::${dependency_id})
 endforeach()
 
-add_executable(facial-recog-pipeline main.cpp fr_transformer.cpp debug.cpp json_util.cpp)
+add_executable(facial-recog-pipeline main.cpp fr_transformer.cpp debug.cpp yaml_util.cpp)
 target_link_libraries(facial-recog-pipeline PRIVATE ${DEPENDENCY_TARGETS})
 
 

@@ -1,11 +1,13 @@
+#include <exception>
 #include <iostream>
 
 #include <gst/gst.h>
 #include <gst/audio/audio.h>
+#include <vector>
 
 #include "debug.h"
 #include "fr_transformer.hpp"
-#include "json_util.hpp"
+#include "yaml_util.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -28,11 +30,22 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  auto face_embeddings = parse_json_embeddings(std::string(argv[1]));
+  std::vector<FaceEmbeddings> face_embeddings;
+  
+  try 
+  {
+    face_embeddings = parse_yaml_embeddings(std::string(argv[1]));
+  }
+  catch (std::exception e)
+  {
+    std::cerr << "Parsing YAML embeddings failed! " << e.what() << std::endl;
+    std::cerr << "Terminating.\n" << std::endl;
+    return 1;
+  }
 
   if (face_embeddings.empty())
   {
-    std::cerr << "Parsing JSON embeddings failed. Stopping!" << std::endl;
+    std::cerr << "No embeddings were found!" << std::endl;
     return 1;
   }
 
