@@ -5,15 +5,22 @@ project(facial-recog-pipeline)
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GS REQUIRED gstreamer-1.0)
-pkg_check_modules(GS_VIDEO REQUIRED gstreamer-video-1.0)
-pkg_check_modules(OCV REQUIRED opencv4)
-pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+set(PKG_CONFIG_DEPENDENCIES
+	gstreamer-1.0
+	gstreamer-video-1.0
+	opencv4
+	jsoncpp
+)
+
+set(DEPENDENCY_TARGETS)
+foreach(dependency IN LISTS PKG_CONFIG_DEPENDENCIES)
+	string(MAKE_C_IDENTIFIER "${dependency}" dependency_id)
+	string(TOUPPER "${dependency_id}" dependency_id)
+	pkg_check_modules(${dependency_id} REQUIRED IMPORTED_TARGET "${dependency}")
+	list(APPEND DEPENDENCY_TARGETS PkgConfig::${dependency_id})
+endforeach()
 
 add_executable(facial-recog-pipeline main.cpp fr_transformer.cpp debug.cpp json_util.cpp)
-
-target_include_directories(facial-recog-pipeline PUBLIC ${GS_INCLUDE_DIRS} ${GS_VIDEO_INCLUDE_DIRS} ${OCV_INCLUDE_DIRS} ${JSONCPP_INCLUDE_DIRS})
-target_link_libraries(facial-recog-pipeline ${GS_LIBRARIES} ${GS_VIDEO_LIBRARIES} ${OCV_LIBRARIES} ${JSONCPP_LIBRARIES})
-target_compile_options(facial-recog-pipeline PUBLIC ${GS_CFLAGS_OTHER} ${GS_VIDEO_CFLAGS_OTHER} ${OCV_CFLAGS_OTHER})
+target_link_libraries(facial-recog-pipeline PRIVATE ${DEPENDENCY_TARGETS})
 
 
