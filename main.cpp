@@ -63,7 +63,7 @@ bool create_webcam_pipeline(std::string face_dataset_data_path)
 
   if (face_dataset.empty())
   {
-    std::cerr << "No embeddings were loaded!" << std::endl;
+    std::cerr << "No embeddings were loaded." << std::endl;
     return 1;
   }
 
@@ -78,7 +78,7 @@ bool create_webcam_pipeline(std::string face_dataset_data_path)
         ""
   );
 
-  std::cout << "Loading facial recognition models was successful!" << std::endl;
+  std::cout << "Loaded facial recognition models." << std::endl;
 
   /* Create the elements */
   source          = gst_element_factory_make ("v4l2src", "source");
@@ -174,7 +174,7 @@ bool create_mp4_pipeline(std::string input_mp4_file_path, std::string face_datas
 
   if (face_dataset.empty())
   {
-    std::cerr << "No embeddings were loaded!" << std::endl;
+    std::cerr << "No embeddings were loaded." << std::endl;
     return 1;
   }
 
@@ -189,7 +189,7 @@ bool create_mp4_pipeline(std::string input_mp4_file_path, std::string face_datas
         ""
   );
 
-  std::cout << "Loading facial recognition models was successful!" << std::endl;
+  std::cout << "Loaded facial recognition models." << std::endl;
 
   /* Create the elements */
   source          = gst_element_factory_make ("filesrc", "source");
@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
 
   if (error)
   {
-    std::cerr << "Pipeline could not be created!" << std::endl;
+    std::cerr << "Pipeline could not be created." << std::endl;
     return 1;
   }
 

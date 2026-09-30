@@ -32,7 +32,7 @@ std::vector<FaceEmbeddings> parse_yaml_embeddings(std::string file_path)
         face_data["embeddings"] >> face_embeddings.embeddings;
         face_database.push_back(std::move(face_embeddings));
 
-        std::cout << "Loaded " << face_database.back().embeddings.size() << " faces for " << face_database.back().name << "\n";
+        std::cout << "Loaded " << face_database.back().embeddings.size() << " face embeddings for " << face_database.back().name << ".\n";
     }
 
     fs.release();
