@@ -13,43 +13,19 @@
 #include "fr_transformer.hpp"
 #include "yaml_util.hpp"
 
-int main(int argc, char *argv[])
+bool create_webcam_pipeline(std::string face_dataset_data_path)
 {
   GstElement *pipeline, *source, *caps_filter, *mjpeg, *video_convert, *fr_transformer, *video_convert2, *sink;
   GstBus *bus;
   GstMessage *msg;
 
-  /* Initialize GStreamer */
-  gst_init (&argc, &argv);
-
-  if (!gst_element_register(nullptr, "fr-transformer", GST_RANK_NONE, GST_TYPE_FR_TRANSFORMER))
-  {
-    std::cerr << "Failed to register myprocess element" << std::endl;
-    return 1;
-  }
-
-  if (argc < 2)
-  {
-    std::cerr << "Not enough arguments. Format is <app> <input-face-embeddings-file>" << std::endl;
-    return 1;
-  }
-
   std::vector<FaceEmbeddings> face_dataset;
   
-  try 
-  {
-    face_dataset = parse_yaml_embeddings(std::string(argv[1]));
-  }
-  catch (std::exception e)
-  {
-    std::cerr << "Parsing YAML embeddings failed! " << e.what() << std::endl;
-    std::cerr << "Terminating.\n" << std::endl;
-    return 1;
-  }
+  face_dataset = parse_yaml_embeddings(face_dataset_data_path);
 
   if (face_dataset.empty())
   {
-    std::cerr << "No embeddings were found!" << std::endl;
+    std::cerr << "No embeddings were loaded!" << std::endl;
     return 1;
   }
 
@@ -145,5 +121,54 @@ int main(int argc, char *argv[])
   gst_object_unref (bus);
   gst_element_set_state (pipeline, GST_STATE_NULL);
   gst_object_unref (pipeline);
+  return 0;
+}
+
+int main(int argc, char *argv[])
+{
+  // Initialize GStreamer
+  gst_init (&argc, &argv);
+
+  // Register custom components
+  if (!gst_element_register(nullptr, "fr-transformer", GST_RANK_NONE, GST_TYPE_FR_TRANSFORMER))
+  {
+    std::cerr << "Failed to register myprocess element" << std::endl;
+    return 1;
+  }
+
+  // Parse arguments
+  if (argc < 3)
+  {
+    std::cerr << "Not enough arguments. Format is <app> <source-type> <input-face-embeddings-file>" << std::endl;
+    return 1;
+  }
+
+  std::string source_type            = argv[1];
+  std::string face_dataset_file_path = argv[2];
+
+  if (source_type == "webcam")
+  {
+    std::cout << "Source type is: Camera" << std::endl;
+
+    bool error = create_webcam_pipeline(face_dataset_file_path);
+
+    if (error)
+    {
+      std::cerr << "Pipeline could not be created!" << std::endl;
+      return 1;
+    }
+  }
+  else if (source_type == "mp4-video")
+  {
+    std::cout << "Source type is: MP4 video file" << std::endl;
+
+    // TODO
+  }
+  else
+  {
+    std::cerr << "Invalid source type provided - <" << source_type << ">" << std::endl;
+    return 1;
+  }
+
   return 0;
 }

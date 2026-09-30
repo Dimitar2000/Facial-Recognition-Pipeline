@@ -16,9 +16,8 @@ std::vector<FaceEmbeddings> parse_yaml_embeddings(std::string file_path)
 
     if (!fs.isOpened())
     {
-        throw std::runtime_error(
-            "Could not open: " + file_path
-        );
+        std::cerr << "Could not open " << file_path  << std::endl;
+        return {};
     }
 
     std::vector<FaceEmbeddings> face_database;
