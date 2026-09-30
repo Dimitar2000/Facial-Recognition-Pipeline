@@ -11,6 +11,7 @@
 #include "opencv2/imgproc.hpp"
 #include "opencv2/objdetect.hpp"
 #include "yaml_util.hpp"
+#include <iostream>
 #include <opencv2/objdetect/face.hpp>
 
 #define RECORD_START(el, b) (b = gst_element_get_current_running_time(el))
@@ -171,57 +172,94 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
     GstClockTime clock_time_end = gst_element_get_current_running_time(transformer_el);
 
     RECORD_END(transformer_el, clock_time_start, "Total");
+    std::cout << std::endl;
 
     return gst_pad_push (transformer->srcpad, buf);
 }
 
 static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame)
 {
-    GstElement       *el = GST_ELEMENT(transformer);
+    GstElement  *el = GST_ELEMENT(transformer);
+    GstClockTime clock_time_base;
 
-    std::vector<cv::Rect> faces;
+    cv::Mat faces;
 
-    // GstClockTime clock_time_base;
-    
-    // RECORD_START(el, clock_time_base);
-    // cv::Mat gray = frame.clone();
-    // RECORD_END(el, clock_time_base, "Frame copy");
-    
-    // RECORD_START(el, clock_time_base);
-    // cvtColor(gray, gray, cv::COLOR_RGB2GRAY); // Convert to Gray Scale
-    // RECORD_END(el, clock_time_base, "Greyscale");
+    RECORD_START(el, clock_time_base);
+    transformer->face_detector->setInputSize(frame.size());
+    RECORD_END(el, clock_time_base, "Setting input size");
 
-    // cv::Mat smallImg;
+    RECORD_START(el, clock_time_base);
+    transformer->face_detector->detect(frame, faces);
+    RECORD_END(el, clock_time_base, "Detection");
 
-    // // Resize the Grayscale Image 
-    // RECORD_START(el, clock_time_base);
-    // resize( gray, smallImg, cv::Size(), 1, 1 , cv::INTER_LINEAR); 
-    // RECORD_END(el, clock_time_base, "Resize");
+    if (faces.empty())
+    {
+        std::cout << "No faces detected\n";
+        return;
+    }
 
-    // RECORD_START(el, clock_time_base);
-    // equalizeHist( smallImg, smallImg );
-    // RECORD_END(el, clock_time_base, "Equalization");
+    for (int i = 0; i < faces.rows; i++)
+    {
+        cv::Mat face = faces.row(i);
+        cv::Mat aligned_face;
+        cv::Mat embedding;
 
-    // // Detect faces of different sizes using cascade classifier 
-    // RECORD_START(el, clock_time_base);
-    // cascade.detectMultiScale(smallImg, faces, 1.1, 
-    //                         3, 0|cv::CASCADE_SCALE_IMAGE, cv::Size(30, 30) );
-    // RECORD_END(el, clock_time_base, "Detection");
+        RECORD_START(el, clock_time_base);
+        transformer->face_recogniser->alignCrop(frame, 
+                                                face,
+                                                aligned_face);
+        RECORD_END(el, clock_time_base, "Alignment");
 
-    // // Draw circles around the faces
-    // for ( size_t i = 0; i < faces.size(); i++ )
-    // {
-    //     cv::Rect r = faces[i];
-    //     cv::Scalar color = cv::Scalar(255, 0, 0); // Color for Drawing tool
+        RECORD_START(el, clock_time_base);
+        transformer->face_recogniser->feature(aligned_face,
+                                              embedding);
+        RECORD_END(el, clock_time_base, "Embedding");
 
-    //     r.x = r.x - (r.width * (sqrt(zoom_out_rec_scale) - 1) / 2);
-    //     r.y = r.y - (r.height * (sqrt(zoom_out_rec_scale) - 1) / 2);
-    //     r.width = r.width * sqrt(zoom_out_rec_scale);
-    //     r.height = r.height * sqrt(zoom_out_rec_scale);
+        int best_matches            =  0;
+        std::string best_match_name = "Unknown";
 
-    //     rectangle(frame, 
-    //               cv::Point(cvRound(r.x*scale), cvRound(r.y*scale)),
-    //               cv::Point(cvRound((r.x + r.width-1)*scale), cvRound((r.y + r.height-1)*scale)), 
-    //               color, 3, 8, 0);
-    // }
+        RECORD_START(el, clock_time_base);
+        for (const auto& [name, ref_embeddings]: transformer->face_database)
+        {
+            std::cout << "Matching against reference embeddings of " << name << " ..." << std::endl;
+
+            int matches = 0;
+
+            for (const auto& ref_embedding: ref_embeddings)
+            {
+                double similarity = transformer->face_recogniser->match(embedding,
+                                                                        ref_embedding,
+                                                                        cv::FaceRecognizerSF::FR_COSINE);
+
+                if (similarity >= 0.85)
+                {
+                    matches++;
+                }
+            }
+
+            if (matches > best_matches)
+            {
+                best_matches = matches;
+                best_match_name = name;
+            }
+        }
+        RECORD_END(el, clock_time_base, "Matching");
+
+        float x      = face.at<float>(0, 0);
+        float y      = face.at<float>(0, 1);
+        float width  = face.at<float>(0, 2);
+        float height = face.at<float>(0, 3);
+
+        cv::rectangle(frame,
+                      cv::Rect(static_cast<int>(x), static_cast<int>(y),
+                               static_cast<int>(width),
+                               static_cast<int>(height)),
+                      cv::Scalar(0, 255, 0), 2);
+        cv::putText(frame,
+                    best_match_name,
+                    cv::Point2d(static_cast<int>(x), static_cast<int>(y - 2)),
+                    cv::FONT_HERSHEY_PLAIN,
+                    1, {255, 0, 0}, 2);
+    }
+
 }
