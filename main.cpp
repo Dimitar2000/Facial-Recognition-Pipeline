@@ -12,6 +12,45 @@
 #include "fr_transformer.hpp"
 #include "yaml_util.hpp"
 
+static void on_decodebin_pad_added(GstElement *, GstPad *new_pad, gpointer user_data)
+{
+  GstElement *video_convert = GST_ELEMENT(user_data);
+  GstPad *sink_pad = gst_element_get_static_pad(video_convert, "sink");
+  if (gst_pad_is_linked(sink_pad))
+  {
+    gst_object_unref(sink_pad);
+    return;
+  }
+
+  GstCaps *caps = gst_pad_get_current_caps(new_pad);
+  if (!caps)
+  {
+    caps = gst_pad_query_caps(new_pad, nullptr);
+  }
+
+  bool is_video = false;
+  if (caps && !gst_caps_is_empty(caps) && !gst_caps_is_any(caps))
+  {
+    const GstStructure *structure = gst_caps_get_structure(caps, 0);
+    is_video = g_str_has_prefix(gst_structure_get_name(structure), "video/");
+  }
+
+  if (is_video)
+  {
+    GstPadLinkReturn result = gst_pad_link(new_pad, sink_pad);
+    if (result != GST_PAD_LINK_OK)
+    {
+      g_printerr("Could not link decoded video pad (error %d).\n", result);
+    }
+  }
+
+  if (caps)
+  {
+    gst_caps_unref(caps);
+  }
+  gst_object_unref(sink_pad);
+}
+
 bool create_webcam_pipeline(std::string face_dataset_data_path)
 {
   GstElement *pipeline, *source, *caps_filter, *mjpeg, *video_convert, *fr_transformer, *video_convert2, *sink;
@@ -181,12 +220,14 @@ bool create_mp4_pipeline(std::string input_mp4_file_path, std::string face_datas
 
   /* Link all elements that can be automatically linked because they have "Always" pads */
   gst_bin_add_many (GST_BIN (pipeline), source, decoder, video_convert, fr_transformer, video_convert2, sink, NULL);
-  
-  if (gst_element_link_many (source, decoder, video_convert, fr_transformer, video_convert2, sink, NULL) != TRUE) {
+
+  if (gst_element_link(source, decoder) != TRUE ||
+      gst_element_link_many(video_convert, fr_transformer, video_convert2, sink, NULL) != TRUE) {
     g_printerr ("Elements could not be linked.\n");
     gst_object_unref (pipeline);
     return 1;
   }
+  g_signal_connect(decoder, "pad-added", G_CALLBACK(on_decodebin_pad_added), video_convert);
 
   /* Start playing the pipeline */
   gst_element_set_state (pipeline, GST_STATE_PLAYING);
