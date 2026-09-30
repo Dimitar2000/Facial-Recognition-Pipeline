@@ -1,18 +1,13 @@
 #include "fr_transformer.hpp"
 
-#include "glib.h"
-#include "gst/gstclock.h"
-#include "gst/gstelement.h"
-
-#include "gst/video/video-frame.h"
-#include "gst/video/video-info.h"
-#include "opencv2/core/mat.hpp"
-#include "opencv2/core/types.hpp"
-#include "opencv2/imgproc.hpp"
-#include "opencv2/objdetect.hpp"
-#include "yaml_util.hpp"
 #include <iostream>
-#include <opencv2/objdetect/face.hpp>
+
+#include <gst/gstclock.h>
+#include <gst/video/video-frame.h>
+#include <gst/video/video-info.h>
+#include <opencv2/imgproc.hpp>
+
+#include "yaml_util.hpp"
 
 #define RECORD_START(el, b) (b = gst_element_get_current_running_time(el))
 #define RECORD_END(el, b, msg) (g_print("%-20s: %11lu\n", msg, gst_element_get_current_running_time(el) - b))
