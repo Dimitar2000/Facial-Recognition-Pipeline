@@ -262,7 +262,7 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
                                                                         ref_embedding,
                                                                         cv::FaceRecognizerSF::FR_COSINE);
 
-                if (similarity >= 0.85)
+                if (similarity >= 0.75)
                 {
                     matches++;
                 }
