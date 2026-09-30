@@ -1,0 +1,239 @@
+#include <exception>
+#include <gst/gstelement.h>
+#include <gst/gstobject.h>
+#include <gst/gstpipeline.h>
+#include <gst/gstutils.h>
+#include <string>
+
+#include "fr_transformer.hpp"
+
+class FRPipeline
+{
+    public:
+        void run() 
+        {
+            // Start pipeline
+            gst_element_set_state (pipeline, GST_STATE_PLAYING);
+            
+            // Wait until error or EOS
+            GstBus * bus = gst_element_get_bus (pipeline);
+            GstMessage * msg = gst_bus_timed_pop_filtered (bus,
+                                                           GST_CLOCK_TIME_NONE, 
+                                                           static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
+
+            // Parse message
+            if (msg != NULL) {
+                GError *err;
+                gchar *debug_info;
+                
+                switch (GST_MESSAGE_TYPE (msg)) 
+                {
+                case GST_MESSAGE_ERROR:
+                    gst_message_parse_error (msg, &err, &debug_info);
+                    g_printerr ("Error received from element %s: %s\n",
+                        GST_OBJECT_NAME (msg->src), err->message);
+                    g_printerr ("Debugging information: %s\n",
+                        debug_info ? debug_info : "none");
+                    g_clear_error (&err);
+                    g_free (debug_info);
+
+                    break;
+                case GST_MESSAGE_EOS:
+                    g_print ("End-Of-Stream reached.\n");
+                    break;
+                default:
+                    /* We should not reach here because we only asked for ERRORs and EOS */
+                    g_printerr ("Unexpected message received.\n");
+                    break;
+                }
+                gst_message_unref (msg);
+            }
+
+            // Release running resources
+            gst_object_unref (bus);
+
+            // Reset pipeline
+            gst_element_set_state (pipeline, GST_STATE_NULL);
+        }
+
+        virtual ~FRPipeline()
+        {
+            /* Free resources */
+            gst_object_unref (pipeline);
+        }
+
+    protected:
+        FRPipeline() = default;
+
+        FRPipeline(std::string face_dataset_file_path, 
+                   std::string yunet_model_file_path, 
+                   std::string sface_model_file_path)
+        {
+            // Create the common elements
+            video_convert   = gst_element_factory_make ("videoconvert", "video_convert");
+            fr_transformer  = gst_element_factory_make ("fr-transformer", "facial-recognition-transformer");
+            video_convert2  = gst_element_factory_make ("videoconvert", "video_convert_2");
+            sink            = gst_element_factory_make ("autovideosink", "sink");
+
+            /* Create the empty pipeline */
+            pipeline = gst_pipeline_new ("webcam-pipeline");
+
+            if (!pipeline || !video_convert || !fr_transformer || !video_convert2 || !sink)
+            {
+                g_printerr ("Not all elements could be created.\n");                
+                gst_object_unref (pipeline);
+                throw std::exception();
+            }
+
+            gst_fr_transformer_set_data(GST_FR_TRANSFORMER(fr_transformer),
+                                        face_dataset_file_path,
+                                        yunet_model_file_path,
+                                        sface_model_file_path);
+
+            /* Link all elements that can be automatically linked because they have "Always" pads */
+            gst_bin_add_many (GST_BIN (pipeline), video_convert, fr_transformer, video_convert2, sink, NULL);
+            
+            if (gst_element_link_many (video_convert, fr_transformer, video_convert2, sink, NULL) != TRUE) {
+                g_printerr ("Elements could not be linked.\n");
+                gst_object_unref (pipeline);
+                return;
+            }
+        }
+
+        GstElement * get_pipeline() {
+            return pipeline;
+        }
+
+        GstElement * get_source() {
+            return video_convert;
+        }
+
+    protected:
+        GstElement *pipeline, *mjpeg, *video_convert, *fr_transformer, *video_convert2, *sink;
+};
+
+class WebcamFRPipeline: public FRPipeline
+{
+    public:
+        WebcamFRPipeline(std::string face_dataset_file_path, 
+                         std::string yunet_model_file_path, 
+                         std::string sface_model_file_path)
+        :
+            FRPipeline(face_dataset_file_path, yunet_model_file_path, sface_model_file_path)
+        {
+            // Create the elements
+            source          = gst_element_factory_make ("v4l2src", "source");
+            caps_filter     = gst_element_factory_make ("capsfilter", "resolution");
+            mjpeg           = gst_element_factory_make ("jpegdec", "jpeg decoder");
+
+            if (!source || !caps_filter || !mjpeg)
+            {
+                g_printerr ("Not all elements could be created.\n");
+                return;
+            }
+
+            // Set required camera frame format and resolution
+            GstCaps* caps = gst_caps_new_simple("image/jpeg", 
+                                                "width", G_TYPE_INT, 1920,
+                                                "height", G_TYPE_INT, 1080,
+                                                NULL);
+            g_object_set(caps_filter, "caps", caps, NULL);
+            gst_caps_unref(caps);
+
+            /* Link all elements that can be automatically linked because they have "Always" pads */
+            gst_bin_add_many (GST_BIN (get_pipeline()), source, caps_filter, mjpeg, NULL);
+            
+            if (gst_element_link_many (source, caps_filter, mjpeg, get_source(), NULL) != TRUE) {
+                g_printerr ("Elements could not be linked.\n");
+                gst_object_unref (get_pipeline());
+                return;
+            }
+        }
+
+        ~WebcamFRPipeline() = default;
+
+    private:
+        GstElement *source, *caps_filter, *mjpeg;
+};
+
+class MP4FRPipeline: public FRPipeline
+{
+    public:
+        MP4FRPipeline(std::string face_dataset_file_path, 
+                      std::string yunet_model_file_path, 
+                      std::string sface_model_file_path,
+                      std::string input_mp4_file_path)
+        :
+            FRPipeline(face_dataset_file_path, yunet_model_file_path, sface_model_file_path) 
+        {
+            // Create the elements
+            source  = gst_element_factory_make ("filesrc", "source");
+            decoder = gst_element_factory_make ("decodebin", "decoder");
+
+            if (!source || !decoder)
+            {
+                g_printerr ("Not all elements could be created.\n");
+                return;
+            }
+
+            // Set input MP4 video file location for streaming 
+            g_object_set(source, "location", input_mp4_file_path.c_str(), NULL);
+
+            /* Link all elements that can be automatically linked because they have "Always" pads */
+            gst_bin_add_many (GST_BIN (get_pipeline()), source, decoder, NULL);
+            
+            if (gst_element_link_many (source, decoder, NULL) != TRUE) {
+                g_printerr ("Elements could not be linked.\n");
+                gst_object_unref (get_pipeline());
+                return;
+            }
+
+            g_signal_connect(decoder, "pad-added", G_CALLBACK(MP4FRPipeline::on_decodebin_pad_added), video_convert);
+        }
+
+        ~MP4FRPipeline() = default;
+
+    private:
+        static void on_decodebin_pad_added(GstElement *, GstPad *new_pad, gpointer user_data)
+        {
+            GstElement *video_convert = GST_ELEMENT(user_data);
+            GstPad *sink_pad = gst_element_get_static_pad(video_convert, "sink");
+            
+            if (gst_pad_is_linked(sink_pad))
+            {
+                gst_object_unref(sink_pad);
+                return;
+            }
+
+            GstCaps *caps = gst_pad_get_current_caps(new_pad);
+            if (!caps)
+            {
+                caps = gst_pad_query_caps(new_pad, nullptr);
+            }
+
+            bool is_video = false;
+            if (caps && !gst_caps_is_empty(caps) && !gst_caps_is_any(caps))
+            {
+                const GstStructure *structure = gst_caps_get_structure(caps, 0);
+                is_video = g_str_has_prefix(gst_structure_get_name(structure), "video/");
+            }
+
+            if (is_video)
+            {
+                GstPadLinkReturn result = gst_pad_link(new_pad, sink_pad);
+                if (result != GST_PAD_LINK_OK)
+                {
+                g_printerr("Could not link decoded video pad (error %d).\n", result);
+                }
+            }
+
+            if (caps)
+            {
+                gst_caps_unref(caps);
+            }
+            gst_object_unref(sink_pad);
+        }
+    
+    private:
+        GstElement *source, *decoder;
+};

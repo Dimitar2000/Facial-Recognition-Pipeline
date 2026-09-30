@@ -1,6 +1,7 @@
+#pragma once
+
 #include "gst/gstelement.h"
 #include "gst/gstpad.h"
-#include "yaml_util.hpp"
 #include <opencv2/objdetect/face.hpp>
 
 #define GST_TYPE_FR_TRANSFORMER (gst_fr_transformer_get_type())
