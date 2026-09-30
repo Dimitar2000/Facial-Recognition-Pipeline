@@ -22,7 +22,7 @@ image_paths = sorted(
 
 print("[INFO] quantifying faces...")
 detector = cv2.FaceDetectorYN_create(
-	args.yunet_model, "", (320, 320), 0.85, 0.3, 5000
+	args.yunet_model, "", (0, 0), 0.85, 0.3, 5000
 )
 recognizer = cv2.FaceRecognizerSF_create(args.sface_model, "")
 out_encodings = {}

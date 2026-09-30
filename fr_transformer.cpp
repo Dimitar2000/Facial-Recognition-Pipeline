@@ -102,7 +102,7 @@ bool gst_fr_transformer_set_data(GstFRTransformer * transformer,
 
     transformer->face_detector = cv::FaceDetectorYN::create(yunet_model_file_path,
                                                             "",
-                                                            cv::Size(320, 320));
+                                                            cv::Size(0, 0));
 
     transformer->face_recogniser = cv::FaceRecognizerSF::create(sface_model_file_path, 
 																"");
