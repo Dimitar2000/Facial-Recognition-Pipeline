@@ -84,14 +84,31 @@ static void gst_fr_transformer_init (GstFRTransformer *filter)
     gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
 }
 
-void gst_fr_transformer_set_data(GstFRTransformer * transformer,
-                                 cv::Ptr<cv::FaceDetectorYN>&& face_detector,
-                                 cv::Ptr<cv::FaceRecognizerSF>&& face_recogniser,
-                                 std::vector<FaceEmbeddings>&& face_database)
+bool gst_fr_transformer_set_data(GstFRTransformer * transformer,
+                                 const std::string& face_dataset_file_path,
+                                 const std::string& yunet_model_file_path,
+                                 const std::string& sface_model_file_path)
 {
-    transformer->face_detector = face_detector;
-    transformer->face_recogniser = face_recogniser;
+    std::vector<FaceEmbeddings> face_database = parse_yaml_embeddings(face_dataset_file_path);
+
+    if (face_database.empty())
+    {
+        std::cerr << "No embeddings were loaded." << std::endl;
+        return 1;
+    }
+
     transformer->face_database = face_database;
+
+    transformer->face_detector = cv::FaceDetectorYN::create(yunet_model_file_path,
+                                                            "",
+                                                            cv::Size(320, 320));
+
+    transformer->face_recogniser = cv::FaceRecognizerSF::create(sface_model_file_path, 
+																"");
+
+	std::cout << "Loaded facial recognition models." << std::endl;
+
+	return 0;
 }
 
 gboolean gst_fr_transformer_sink_event (GstPad *pad, GstObject *parent, GstEvent  *event)

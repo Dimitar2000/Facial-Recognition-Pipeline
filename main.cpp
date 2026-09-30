@@ -6,11 +6,9 @@
 #include <gst/gst.h>
 #include <gst/audio/audio.h>
 #include <opencv2/objdetect/face.hpp>
-#include <vector>
 
 #include "debug.h"
 #include "fr_transformer.hpp"
-#include "yaml_util.hpp"
 
 static void on_decodebin_pad_added(GstElement *, GstPad *new_pad, gpointer user_data)
 {
@@ -57,29 +55,6 @@ bool create_webcam_pipeline(std::string face_dataset_file_path, std::string yune
   GstBus *bus;
   GstMessage *msg;
 
-  std::vector<FaceEmbeddings> face_dataset;
-  
-  face_dataset = parse_yaml_embeddings(face_dataset_file_path);
-
-  if (face_dataset.empty())
-  {
-    std::cerr << "No embeddings were loaded." << std::endl;
-    return 1;
-  }
-
-  auto face_detector = cv::FaceDetectorYN::create(
-        yunet_model_file_path,
-        "",
-        cv::Size(320, 320)
-  );
-
-  auto face_recogniser = cv::FaceRecognizerSF::create(
-        sface_model_file_path,
-        ""
-  );
-
-  std::cout << "Loaded facial recognition models." << std::endl;
-
   /* Create the elements */
   source          = gst_element_factory_make ("v4l2src", "source");
   caps_filter     = gst_element_factory_make ("capsfilter", "resolution");
@@ -104,14 +79,12 @@ bool create_webcam_pipeline(std::string face_dataset_file_path, std::string yune
                                       NULL);
 
   g_object_set(caps_filter, "caps", caps, NULL);
-  gst_caps_unref(caps);  
+  gst_caps_unref(caps);
 
-  gst_fr_transformer_set_data(
-    GST_FR_TRANSFORMER(fr_transformer),
-    std::move(face_detector),
-    std::move(face_recogniser),
-    std::move(face_dataset)
-  );
+  gst_fr_transformer_set_data(GST_FR_TRANSFORMER(fr_transformer),
+                              face_dataset_file_path,
+                              yunet_model_file_path,
+                              sface_model_file_path);
 
   /* Link all elements that can be automatically linked because they have "Always" pads */
   gst_bin_add_many (GST_BIN (pipeline), source, caps_filter, mjpeg, video_convert, fr_transformer, video_convert2, sink, NULL);
@@ -162,34 +135,11 @@ bool create_webcam_pipeline(std::string face_dataset_file_path, std::string yune
   return 0;
 }
 
-bool create_mp4_pipeline(std::string input_mp4_file_path, std::string yunet_model_file_path, std::string sface_model_file_path, std::string face_dataset_data_path)
+bool create_mp4_pipeline( std::string face_dataset_file_path, std::string yunet_model_file_path, std::string sface_model_file_path, std::string input_mp4_file_path)
 {
   GstElement *pipeline, *source, *decoder, *video_convert, *fr_transformer, *video_convert2, *sink;
   GstBus *bus;
   GstMessage *msg;
-
-  std::vector<FaceEmbeddings> face_dataset;
-  
-  face_dataset = parse_yaml_embeddings(face_dataset_data_path);
-
-  if (face_dataset.empty())
-  {
-    std::cerr << "No embeddings were loaded." << std::endl;
-    return 1;
-  }
-
-  auto face_detector = cv::FaceDetectorYN::create(
-        yunet_model_file_path,
-        "",
-        cv::Size(320, 320)
-  );
-
-  auto face_recogniser = cv::FaceRecognizerSF::create(
-        sface_model_file_path,
-        ""
-  );
-
-  std::cout << "Loaded facial recognition models." << std::endl;
 
   /* Create the elements */
   source          = gst_element_factory_make ("filesrc", "source");
@@ -211,12 +161,10 @@ bool create_mp4_pipeline(std::string input_mp4_file_path, std::string yunet_mode
   // Configure elements
   g_object_set(source, "location", input_mp4_file_path.c_str(), NULL);
 
-  gst_fr_transformer_set_data(
-    GST_FR_TRANSFORMER(fr_transformer),
-    std::move(face_detector),
-    std::move(face_recogniser),
-    std::move(face_dataset)
-  );
+  gst_fr_transformer_set_data(GST_FR_TRANSFORMER(fr_transformer),
+                              face_dataset_file_path,
+                              yunet_model_file_path,
+                              sface_model_file_path);
 
   /* Link all elements that can be automatically linked because they have "Always" pads */
   gst_bin_add_many (GST_BIN (pipeline), source, decoder, video_convert, fr_transformer, video_convert2, sink, NULL);
@@ -316,7 +264,7 @@ int main(int argc, char *argv[])
 
     std::string input_mp4_file_path = argv[5];
 
-    error = create_mp4_pipeline(input_mp4_file_path, yunet_model_file_path, sface_model_file_path, face_dataset_file_path);
+    error = create_mp4_pipeline(face_dataset_file_path, yunet_model_file_path, sface_model_file_path, input_mp4_file_path);
   }
   else
   {

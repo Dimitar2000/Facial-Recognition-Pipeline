@@ -13,10 +13,10 @@ G_DECLARE_FINAL_TYPE(
     GstElement
 )
 
-void gst_fr_transformer_set_data(GstFRTransformer * transformer,
-                                 cv::Ptr<cv::FaceDetectorYN>&& face_detector,
-                                 cv::Ptr<cv::FaceRecognizerSF>&& face_recogniser,
-                                 std::vector<FaceEmbeddings>&& face_database);
+bool gst_fr_transformer_set_data(GstFRTransformer * transformer,
+                                 const std::string& face_dataset_file_path,
+                                 const std::string& yunet_model_file_path,
+                                 const std::string& sface_model_file_path);
 
 gboolean gst_fr_transformer_sink_event (GstPad *pad, 
                                         GstObject *parent, 
