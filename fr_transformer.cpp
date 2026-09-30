@@ -8,6 +8,7 @@
 #include <gst/video/video-info.h>
 #include <opencv2/core/types.hpp>
 #include <opencv2/imgproc.hpp>
+#include <string>
 
 #include "yaml_util.hpp"
 
@@ -215,9 +216,7 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
         scaled_frame = frame;
     }
 
-    RECORD_START(el, clock_time_base);
     transformer->face_detector->setInputSize(scaled_frame.size());
-    RECORD_END(el, clock_time_base, "Setting input size");
 
     RECORD_START(el, clock_time_base);
     transformer->face_detector->detect(scaled_frame, faces);
@@ -235,26 +234,26 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
         cv::Mat aligned_face;
         cv::Mat embedding;
 
-        RECORD_START(el, clock_time_base);
         transformer->face_recogniser->alignCrop(scaled_frame, 
                                                 face,
                                                 aligned_face);
-        RECORD_END(el, clock_time_base, "Alignment");
 
         RECORD_START(el, clock_time_base);
         transformer->face_recogniser->feature(aligned_face,
                                               embedding);
         RECORD_END(el, clock_time_base, "Embedding");
 
-        int best_matches            =  0;
+        int best_matches            = 0;
+        double best_match_min       = 0;
+        double best_match_max       = 0;
         std::string best_match_name = "Unknown";
 
         RECORD_START(el, clock_time_base);
         for (const auto& [name, ref_embeddings]: transformer->face_database)
         {
-            std::cout << "Matching against reference embeddings of " << name << " ..." << std::endl;
-
-            int matches = 0;
+            int matches      = 0;
+            double match_min = MAXFLOAT;
+            double match_max = 0;
 
             for (const auto& ref_embedding: ref_embeddings)
             {
@@ -265,6 +264,9 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
                 if (similarity >= 0.75)
                 {
                     matches++;
+
+                    if (similarity > match_max) match_max = similarity;
+                    if (similarity < match_min) match_min = similarity;
                 }
             }
 
@@ -272,10 +274,13 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
             {
                 best_matches = matches;
                 best_match_name = name;
+                best_match_max = match_max;
+                best_match_min = match_min;
             }
         }
         RECORD_END(el, clock_time_base, "Matching");
 
+        // Add face bounding box and metadata to frame
         float x      = face.at<float>(0, 0);
         float y      = face.at<float>(0, 1);
         float width  = face.at<float>(0, 2);
@@ -295,11 +300,15 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
                       face_scaled_rect,
                       cv::Scalar(0, 255, 0), 2);
 
+        gchar* box_label = g_strdup_printf("%s: (%.3g, %.3g)", best_match_name.c_str(), best_match_min, best_match_max);
+
         cv::putText(frame,
-                    best_match_name,
+                    box_label,
                     cv::Point2d(static_cast<int>(face_scaled_rect.x), static_cast<int>(face_scaled_rect.y - 2)),
                     cv::FONT_HERSHEY_PLAIN,
                     4, {255, 0, 0}, 2);
+        
+        g_free(box_label);
     }
 
 }
