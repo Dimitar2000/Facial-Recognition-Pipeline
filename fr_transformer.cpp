@@ -1,5 +1,6 @@
 #include "fr_transformer.hpp"
 
+#include <cmath>
 #include <iostream>
 
 #include <gst/gstclock.h>
@@ -157,7 +158,7 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
                   data,
                   stride);
 
-        detect_and_bind_box(transformer, f, {1024, 576});
+        detect_and_bind_box(transformer, f, {1920, 1080});
 
         gst_video_frame_unmap(&frame);
     }
@@ -269,7 +270,7 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
                     best_match_name,
                     cv::Point2d(static_cast<int>(face_scaled_rect.x), static_cast<int>(face_scaled_rect.y - 2)),
                     cv::FONT_HERSHEY_PLAIN,
-                    1, {255, 0, 0}, 2);
+                    (double)original_size.height / scaled_size.height, {255, 0, 0}, 2);
     }
 
 }
