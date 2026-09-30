@@ -6,6 +6,7 @@
 #include <gst/gstclock.h>
 #include <gst/video/video-frame.h>
 #include <gst/video/video-info.h>
+#include <opencv2/core/types.hpp>
 #include <opencv2/imgproc.hpp>
 
 #include "yaml_util.hpp"
@@ -24,7 +25,7 @@ typedef struct _GstFRTransformer {
 
 G_DEFINE_TYPE (GstFRTransformer, gst_fr_transformer, GST_TYPE_ELEMENT);
 
-static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, cv::Size scaled_size);
+static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, int scaled_width);
 
 static void gst_fr_transformer_class_init(GstFRTransformerClass * klass)
 {
@@ -175,7 +176,7 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
                   data,
                   stride);
 
-        detect_and_bind_box(transformer, f, {});
+        detect_and_bind_box(transformer, f, 1024);
 
         gst_video_frame_unmap(&frame);
     }
@@ -190,14 +191,15 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
     return gst_pad_push (transformer->srcpad, buf);
 }
 
-static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, cv::Size scaled_size)
+static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, int scaled_width)
 {
     GstElement  *el = GST_ELEMENT(transformer);
     GstClockTime clock_time_base;
 
     cv::Size original_size = {frame.cols, frame.rows};
-    cv::Mat scaled_frame;
-    cv::Mat faces;
+    cv::Size scaled_size   = {scaled_width, static_cast<int>(scaled_width / original_size.aspectRatio())};
+    cv::Mat  scaled_frame;
+    cv::Mat  faces;
 
     // If the frame does not have to be scaled or it is already smaller
     //  than the scaled version, just use it without compression
