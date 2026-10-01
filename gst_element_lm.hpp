@@ -261,3 +261,50 @@ class GstCapsLM {
     protected:
         GstCaps* caps;
 };
+
+class GstPadLM {
+    public:
+        GstPadLM() : pad(nullptr) {}
+
+        GstPadLM(GstPad* pad) : pad(nullptr) {
+            if (!pad) {
+                throw std::runtime_error("Failed to create GstPad");
+            }
+            if (this->pad) {
+                throw std::runtime_error("GstPad is already set");
+            }
+            this->pad = pad;
+        }
+
+        GstPadLM(const GstPadLM& other) = delete;        
+        GstPadLM& operator=(const GstPadLM& other) = delete;
+
+        GstPadLM(GstPadLM&& other) noexcept{
+            this->pad = other.pad;
+            other.pad = nullptr;
+        }
+
+        GstPadLM& operator=(GstPadLM&& other) noexcept {
+            this->pad = other.pad;
+            other.pad = nullptr;
+
+            return *this;
+        }
+
+        ~GstPadLM() {
+            if (pad) {
+                std::cout << "Unrefing GstPad" << std::endl;
+                gst_object_unref(pad);
+            }
+            else {
+                std::cout << "Skipping unrefing GstPad since it is null" << std::endl;
+            }
+        }
+
+        GstPad* get() const {
+            return pad;
+        }
+
+    protected:
+        GstPad* pad;
+};

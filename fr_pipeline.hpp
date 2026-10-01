@@ -161,14 +161,15 @@ class MP4FRPipeline: public FRPipeline
         static void on_decodebin_pad_added(GstElement *, GstPad *new_pad, gpointer user_data)
         {
             GstElement *video_convert = GST_ELEMENT(user_data);
-            GstPad *sink_pad = gst_element_get_static_pad(video_convert, "sink");
+            GstPadLM sink_pad = GstPadLM(gst_element_get_static_pad(video_convert, "sink"));
             
-            if (gst_pad_is_linked(sink_pad))
+            // If our converter is already linked, we have nothing to do here
+            if (gst_pad_is_linked(sink_pad.get()))
             {
-                gst_object_unref(sink_pad);
                 return;
             }
 
+            // Get the caps of the new source pad
             GstCapsLM caps = GstCapsLM(gst_pad_get_current_caps(new_pad), true);
           
             try {
@@ -185,14 +186,16 @@ class MP4FRPipeline: public FRPipeline
                 throw std::runtime_error("New pad does not have required caps");
             }
 
+            // Check if the new pad is a video pad
             const GstStructure *structure = gst_caps_get_structure(caps.get(), 0);
                 
             if (!g_str_has_prefix(gst_structure_get_name(structure), "video/"))
             {
                 throw std::runtime_error("Decoded pad is not video.\n");
             }
-                    
-            GstPadLinkReturn result = gst_pad_link(new_pad, sink_pad);
+
+            // Link the new pad to the video converter's sink pad
+            GstPadLinkReturn result = gst_pad_link(new_pad, sink_pad.get());
 
             if (result != GST_PAD_LINK_OK)
             {
@@ -200,7 +203,5 @@ class MP4FRPipeline: public FRPipeline
             }
 
             g_printerr("Decodebin pad added and linked successfully.\n");
-
-            gst_object_unref(sink_pad);
         }
 };
