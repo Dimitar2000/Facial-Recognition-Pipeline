@@ -120,3 +120,96 @@ class GstPipelineLM: public GstElementLM {
             }
         }
 };
+
+class GstBusLM {
+    public:
+        GstBusLM() : bus(nullptr) {}
+        GstBusLM(GstBus* bus) : bus(nullptr) {
+            if (!bus) {
+                throw std::runtime_error("Failed to create GstBus");
+            }
+            if (this->bus) {
+                throw std::runtime_error("GstBus is already set");
+            }
+            this->bus = bus;
+        }
+
+        GstBusLM(const GstBusLM& other) = delete;        
+        GstBusLM& operator=(const GstBusLM& other) = delete;
+
+        GstBusLM(GstBusLM&& other) noexcept{
+            this->bus = other.bus;
+            other.bus = nullptr;
+        }
+
+        GstBusLM& operator=(GstBusLM&& other) noexcept {
+            this->bus = other.bus;
+            other.bus = nullptr;
+
+            return *this;
+        }
+
+        ~GstBusLM() {
+            if (bus) {
+                std::cout << "Unrefing GstBus" << std::endl;
+                gst_object_unref(bus);
+            }
+            else {
+                std::cout << "Skipping unrefing GstBus since it is null" << std::endl;
+            }
+        }
+
+        GstBus* get() const {
+            return bus;
+        }
+
+    protected:
+        GstBus* bus;
+};
+
+class GstMessageLM {
+    public:
+        GstMessageLM() : msg(nullptr) {}
+        GstMessageLM(GstMessage* msg) : msg(nullptr) {
+            if (!msg) {
+                throw std::runtime_error("Failed to create GstMessage");
+            }
+            if (this->msg) {
+                throw std::runtime_error("GstMessage is already set");
+            }
+            this->msg = msg;
+        }
+
+        GstMessageLM(const GstMessageLM& other) = delete;        
+        GstMessageLM& operator=(const GstMessageLM& other) = delete;
+
+        GstMessageLM(GstMessageLM&& other) noexcept{
+            this->msg = other.msg;
+            other.msg = nullptr;
+        }
+
+        GstMessageLM& operator=(GstMessageLM&& other) noexcept {
+            this->msg = other.msg;
+            other.msg = nullptr;
+
+            return *this;
+        }
+
+        ~GstMessageLM() {
+            if (msg) {
+                std::cout << "Unrefing GstMessage: " << GST_MESSAGE_TYPE(msg) << std::endl;
+                gst_message_unref(msg);
+            }
+            else {
+                std::cout << "Skipping unrefing GstMessage since it is null" << std::endl;
+            }
+        }
+
+        GstMessage* get() const {
+            return msg;
+        }
+
+    protected:
+        GstMessage* msg;
+};
+

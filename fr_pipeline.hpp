@@ -15,24 +15,25 @@ class FRPipeline
         {
             // Start pipeline
             gst_element_set_state (pipeline.get(), GST_STATE_PLAYING);
-            
+
             // Wait until error or EOS
-            GstBus * bus = gst_element_get_bus (pipeline.get());
-            GstMessage * msg = gst_bus_timed_pop_filtered (bus,
+            GstBusLM bus(gst_element_get_bus (pipeline.get()));
+            
+            GstMessageLM msg(gst_bus_timed_pop_filtered (bus.get(),
                                                            GST_CLOCK_TIME_NONE, 
-                                                           static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
+                                                           static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS)));
 
             // Parse message
-            if (msg != NULL) {
+            if (msg.get() != NULL) {
                 GError *err;
                 gchar *debug_info;
                 
-                switch (GST_MESSAGE_TYPE (msg)) 
+                switch (GST_MESSAGE_TYPE (msg.get())) 
                 {
                 case GST_MESSAGE_ERROR:
-                    gst_message_parse_error (msg, &err, &debug_info);
+                    gst_message_parse_error (msg.get(), &err, &debug_info);
                     g_printerr ("Error received from element %s: %s\n",
-                        GST_OBJECT_NAME (msg->src), err->message);
+                        GST_OBJECT_NAME (msg.get()->src), err->message);
                     g_printerr ("Debugging information: %s\n",
                         debug_info ? debug_info : "none");
                     g_clear_error (&err);
@@ -46,11 +47,7 @@ class FRPipeline
                     g_printerr ("Unexpected message received.\n");
                     break;
                 }
-                gst_message_unref (msg);
             }
-
-            // Release running resources
-            gst_object_unref (bus);
 
             // Reset pipeline
             gst_element_set_state (pipeline.get(), GST_STATE_NULL);
