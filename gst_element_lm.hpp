@@ -213,3 +213,51 @@ class GstMessageLM {
         GstMessage* msg;
 };
 
+class GstCapsLM {
+    public:
+        GstCapsLM() : caps(nullptr) {}
+
+        GstCapsLM(GstCaps* caps, bool allow_null) : caps(nullptr) {
+            if (!caps && !allow_null) {
+                throw std::runtime_error("Failed to create GstCaps");
+            }
+            if (this->caps) {
+                throw std::runtime_error("GstCaps is already set");
+            }
+            this->caps = caps;
+        }
+
+        GstCapsLM(GstCaps* caps) : GstCapsLM(caps, false) {}
+
+        GstCapsLM(const GstCapsLM& other) = delete;        
+        GstCapsLM& operator=(const GstCapsLM& other) = delete;
+
+        GstCapsLM(GstCapsLM&& other) noexcept{
+            this->caps = other.caps;
+            other.caps = nullptr;
+        }
+
+        GstCapsLM& operator=(GstCapsLM&& other) noexcept {
+            this->caps = other.caps;
+            other.caps = nullptr;
+
+            return *this;
+        }
+
+        ~GstCapsLM() {
+            if (caps) {
+                std::cout << "Unrefing GstCaps" << std::endl;
+                gst_caps_unref(caps);
+            }
+            else {
+                std::cout << "Skipping unrefing GstCaps since it is null" << std::endl;
+            }
+        }
+
+        GstCaps* get() const {
+            return caps;
+        }
+
+    protected:
+        GstCaps* caps;
+};

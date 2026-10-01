@@ -105,12 +105,11 @@ class WebcamFRPipeline: public FRPipeline
             GstElementLM mjpeg(gst_element_factory_make ("jpegdec", "jpeg_decoder"));
 
             // Set required camera frame format and resolution
-            GstCaps* caps = gst_caps_new_simple("image/jpeg", 
+            GstCapsLM caps = GstCapsLM(gst_caps_new_simple("image/jpeg", 
                                                 "width", G_TYPE_INT, 1920,
                                                 "height", G_TYPE_INT, 1080,
-                                                NULL);
-            g_object_set(caps_filter.get(), "caps", caps, NULL);
-            gst_caps_unref(caps);
+                                                NULL));
+            g_object_set(caps_filter.get(), "caps", caps.get(), NULL);
 
             /* Link all elements that can be automatically linked because they have "Always" pads */
             pipeline.add_to_pipeline(std::move(source));
@@ -170,32 +169,38 @@ class MP4FRPipeline: public FRPipeline
                 return;
             }
 
-            GstCaps *caps = gst_pad_get_current_caps(new_pad);
-            if (!caps)
+            GstCapsLM caps = GstCapsLM(gst_pad_get_current_caps(new_pad), true);
+          
+            try {
+                caps = GstCapsLM(gst_pad_get_current_caps(new_pad));
+            }
+            catch (std::runtime_error& e) {
+                g_printerr("Failed to query caps from new pad: %s\n", e.what());
+                
+                caps = GstCapsLM(gst_pad_query_caps(new_pad, nullptr), true);
+            }
+            
+            if (gst_caps_is_empty(caps.get()) || gst_caps_is_any(caps.get()))
             {
-                caps = gst_pad_query_caps(new_pad, nullptr);
+                throw std::runtime_error("New pad does not have required caps");
             }
 
-            bool is_video = false;
-            if (caps && !gst_caps_is_empty(caps) && !gst_caps_is_any(caps))
+            const GstStructure *structure = gst_caps_get_structure(caps.get(), 0);
+                
+            if (!g_str_has_prefix(gst_structure_get_name(structure), "video/"))
             {
-                const GstStructure *structure = gst_caps_get_structure(caps, 0);
-                is_video = g_str_has_prefix(gst_structure_get_name(structure), "video/");
+                throw std::runtime_error("Decoded pad is not video.\n");
+            }
+                    
+            GstPadLinkReturn result = gst_pad_link(new_pad, sink_pad);
+
+            if (result != GST_PAD_LINK_OK)
+            {
+                throw std::runtime_error("Could not link decoded video pad " + std::to_string(result) + ").\n");
             }
 
-            if (is_video)
-            {
-                GstPadLinkReturn result = gst_pad_link(new_pad, sink_pad);
-                if (result != GST_PAD_LINK_OK)
-                {
-                    g_printerr("Could not link decoded video pad (error %d).\n", result);
-                }
-            }
+            g_printerr("Decodebin pad added and linked successfully.\n");
 
-            if (caps)
-            {
-                gst_caps_unref(caps);
-            }
             gst_object_unref(sink_pad);
         }
 };

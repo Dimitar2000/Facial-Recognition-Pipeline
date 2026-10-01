@@ -91,7 +91,8 @@ int main(int argc, char *argv[])
     }
     catch(std::exception e)
     {
-        std::cerr << "Pipeline run stopped!" << std::endl;
+        std::cerr << "Pipeline run stopped!\n" 
+                  << "Reason: " << e.what() << std::endl;
     }
     
     return 0;
