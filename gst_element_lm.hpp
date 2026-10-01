@@ -16,7 +16,7 @@ class GstElementLM {
         // Necessary for automatic class initialization in FRPipeline
         GstElementLM() : element(nullptr) {}
 
-        GstElementLM(GstElement* element) {
+        GstElementLM(GstElement* element) : element(nullptr) {
             if (!element) {
                 throw std::runtime_error("Failed to create GstElement");
             }
