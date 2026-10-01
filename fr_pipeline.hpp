@@ -153,7 +153,10 @@ class MP4FRPipeline: public FRPipeline
 
             GstElement* video_convert = pipeline.get_by_name("video_convert");
 
-            g_signal_connect(decoder.get(), "pad-added", G_CALLBACK(MP4FRPipeline::on_decodebin_pad_added), video_convert);
+            g_signal_connect(pipeline.get_by_name("decoder"), 
+                             "pad-added", 
+                             G_CALLBACK(MP4FRPipeline::on_decodebin_pad_added), 
+                             video_convert);
         }
 
         ~MP4FRPipeline() = default;
