@@ -1,11 +1,12 @@
+#include <glib-object.h>
 #include <gst/gstelement.h>
 #include <gst/gstobject.h>
 #include <gst/gstpipeline.h>
 #include <gst/gstutils.h>
-#include <stdexcept>
 #include <string>
 
 #include "fr_transformer.hpp"
+#include "gst_element_lm.hpp"
 
 class FRPipeline
 {
@@ -13,10 +14,10 @@ class FRPipeline
         void run() 
         {
             // Start pipeline
-            gst_element_set_state (pipeline, GST_STATE_PLAYING);
+            gst_element_set_state (pipeline.get(), GST_STATE_PLAYING);
             
             // Wait until error or EOS
-            GstBus * bus = gst_element_get_bus (pipeline);
+            GstBus * bus = gst_element_get_bus (pipeline.get());
             GstMessage * msg = gst_bus_timed_pop_filtered (bus,
                                                            GST_CLOCK_TIME_NONE, 
                                                            static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
@@ -52,17 +53,10 @@ class FRPipeline
             gst_object_unref (bus);
 
             // Reset pipeline
-            gst_element_set_state (pipeline, GST_STATE_NULL);
+            gst_element_set_state (pipeline.get(), GST_STATE_NULL);
         }
 
-        virtual ~FRPipeline()
-        {
-            /* Free resources */
-            if (pipeline)
-            {
-                gst_object_unref (pipeline);
-            }
-        }
+        virtual ~FRPipeline() = default;
 
     protected:
         FRPipeline() = default;
@@ -72,64 +66,31 @@ class FRPipeline
                    std::string sface_model_file_path)
         {
             /* Create the empty pipeline */
-            pipeline = gst_pipeline_new ("webcam-pipeline");
-
-            if (!pipeline)
-            {
-                g_printerr ("Pipeline could not be created by GStreamer.\n");
-                throw std::runtime_error("Pipeline could not be created by GStreamer");
-            }
+            pipeline = GstPipelineLM(gst_pipeline_new ("pipeline"));
 
             // Create the common elements
-            video_convert   = gst_element_factory_make ("videoconvert", "video_convert");
-            fr_transformer  = gst_element_factory_make ("fr-transformer", "facial-recognition-transformer");
-            video_convert2  = gst_element_factory_make ("videoconvert", "video_convert_2");
-            sink            = gst_element_factory_make ("autovideosink", "sink");
+            GstElementLM video_convert(gst_element_factory_make ("videoconvert", "video_convert"));
+            GstElementLM fr_transformer(gst_element_factory_make ("fr-transformer", "facial-recognition-transformer"));
+            GstElementLM video_convert2(gst_element_factory_make ("videoconvert", "video_convert_2"));
+            GstElementLM sink(gst_element_factory_make ("autovideosink", "sink"));
 
-            if (!video_convert || !fr_transformer || !video_convert2 || !sink)
-            {
-                g_printerr ("Not all elements could be created.\n");
-                if (video_convert) gst_object_unref (video_convert);
-                if (fr_transformer) gst_object_unref (fr_transformer);
-                if (video_convert2) gst_object_unref (video_convert2);
-                if (sink) gst_object_unref (sink);
-
-                gst_object_unref (pipeline);
-                pipeline = nullptr;
-
-                throw std::runtime_error("Pipeline elements could not be created");
-            }
-
-            gst_fr_transformer_set_data(GST_FR_TRANSFORMER(fr_transformer),
+            gst_fr_transformer_set_data(GST_FR_TRANSFORMER(fr_transformer.get()),
                                         face_dataset_file_path,
                                         yunet_model_file_path,
                                         sface_model_file_path);
 
-            /* Link all elements that can be automatically linked because they have "Always" pads */
-            gst_bin_add_many (GST_BIN (pipeline), video_convert, fr_transformer, video_convert2, sink, NULL);
-            
-            if (gst_element_link_many (video_convert, fr_transformer, video_convert2, sink, NULL) != TRUE) {
-                g_printerr ("Elements could not be linked.\n");
-                gst_object_unref (pipeline);
-                pipeline = nullptr;
-                throw std::runtime_error("Pipeline elements could not be linked");
-            }
-        }
+            pipeline.add_to_pipeline(std::move(video_convert));
+            pipeline.add_to_pipeline(std::move(fr_transformer));
+            pipeline.add_to_pipeline(std::move(video_convert2));
+            pipeline.add_to_pipeline(std::move(sink));
 
-        GstElement * get_pipeline() {
-            return pipeline;
-        }
-
-        GstElement * get_source() {
-            return video_convert;
+            pipeline.link_elements("video_convert", "facial-recognition-transformer");
+            pipeline.link_elements("facial-recognition-transformer", "video_convert_2");
+            pipeline.link_elements("video_convert_2", "sink");
         }
 
     protected:
-        GstElement *pipeline = nullptr;
-        GstElement *video_convert = nullptr;
-        GstElement *fr_transformer = nullptr;
-        GstElement *video_convert2 = nullptr;
-        GstElement *sink = nullptr;
+        GstPipelineLM pipeline;
 };
 
 class WebcamFRPipeline: public FRPipeline
@@ -142,56 +103,29 @@ class WebcamFRPipeline: public FRPipeline
             FRPipeline(face_dataset_file_path, yunet_model_file_path, sface_model_file_path)
         {
             // Create the elements
-            source          = gst_element_factory_make ("v4l2src", "source");
-            caps_filter     = gst_element_factory_make ("capsfilter", "resolution");
-            mjpeg           = gst_element_factory_make ("jpegdec", "jpeg decoder");
-
-            if (!source || !caps_filter || !mjpeg)
-            {
-                g_printerr ("Not all elements could be created.\n");
-                
-                if (source) 
-                {
-                    gst_object_unref (source);
-                }
-                
-                if (caps_filter)
-                {
-                    gst_object_unref (caps_filter);
-                }
-
-                if (mjpeg) 
-                {
-                    gst_object_unref (mjpeg);
-                }
-
-                throw std::runtime_error("Webcam pipeline elements could not be created");
-            }
+            GstElementLM source(gst_element_factory_make ("v4l2src", "source"));
+            GstElementLM caps_filter(gst_element_factory_make ("capsfilter", "resolution"));
+            GstElementLM mjpeg(gst_element_factory_make ("jpegdec", "jpeg_decoder"));
 
             // Set required camera frame format and resolution
             GstCaps* caps = gst_caps_new_simple("image/jpeg", 
                                                 "width", G_TYPE_INT, 1920,
                                                 "height", G_TYPE_INT, 1080,
                                                 NULL);
-            g_object_set(caps_filter, "caps", caps, NULL);
+            g_object_set(caps_filter.get(), "caps", caps, NULL);
             gst_caps_unref(caps);
 
             /* Link all elements that can be automatically linked because they have "Always" pads */
-            gst_bin_add_many (GST_BIN (get_pipeline()), source, caps_filter, mjpeg, NULL);
-            
-            if (gst_element_link_many (source, caps_filter, mjpeg, get_source(), NULL) != TRUE)
-            {
-                g_printerr ("Elements could not be linked.\n");
-                throw std::runtime_error("Webcam pipeline elements could not be linked");
-            }
+            pipeline.add_to_pipeline(std::move(source));
+            pipeline.add_to_pipeline(std::move(caps_filter));
+            pipeline.add_to_pipeline(std::move(mjpeg));
+
+            pipeline.link_elements("source", "resolution");
+            pipeline.link_elements("resolution", "jpeg_decoder");
+            pipeline.link_elements("jpeg_decoder", "video_convert");
         }
 
         ~WebcamFRPipeline() = default;
-
-    private:
-        GstElement *source = nullptr;
-        GstElement *caps_filter = nullptr;
-        GstElement *mjpeg = nullptr;
 };
 
 class MP4FRPipeline: public FRPipeline
@@ -205,30 +139,21 @@ class MP4FRPipeline: public FRPipeline
             FRPipeline(face_dataset_file_path, yunet_model_file_path, sface_model_file_path) 
         {
             // Create the elements
-            source  = gst_element_factory_make ("filesrc", "source");
-            decoder = gst_element_factory_make ("decodebin", "decoder");
-
-            if (!source || !decoder)
-            {
-                g_printerr ("Not all elements could be created.\n");
-                if (source) gst_object_unref (source);
-                if (decoder) gst_object_unref (decoder);
-                throw std::runtime_error("MP4 pipeline elements could not be created");
-            }
+            GstElementLM source(gst_element_factory_make ("filesrc", "source"));
+            GstElementLM decoder(gst_element_factory_make ("decodebin", "decoder"));
 
             // Set input MP4 video file location for streaming 
-            g_object_set(source, "location", input_mp4_file_path.c_str(), NULL);
+            g_object_set(source.get(), "location", input_mp4_file_path.c_str(), NULL);
 
             /* Link all elements that can be automatically linked because they have "Always" pads */
-            gst_bin_add_many (GST_BIN (get_pipeline()), source, decoder, NULL);
-            
-            if (gst_element_link_many (source, decoder, NULL) != TRUE) 
-            {
-                g_printerr ("Elements could not be linked.\n");
-                throw std::runtime_error("MP4 pipeline elements could not be linked");
-            }
+            pipeline.add_to_pipeline(std::move(source));
+            pipeline.add_to_pipeline(std::move(decoder));
 
-            g_signal_connect(decoder, "pad-added", G_CALLBACK(MP4FRPipeline::on_decodebin_pad_added), video_convert);
+            pipeline.link_elements("source", "decoder");
+
+            GstElement* video_convert = pipeline.get_by_name("video_convert");
+
+            g_signal_connect(decoder.get(), "pad-added", G_CALLBACK(MP4FRPipeline::on_decodebin_pad_added), video_convert);
         }
 
         ~MP4FRPipeline() = default;
@@ -273,8 +198,4 @@ class MP4FRPipeline: public FRPipeline
             }
             gst_object_unref(sink_pad);
         }
-    
-    private:
-        GstElement *source = nullptr;
-        GstElement *decoder = nullptr;
 };
