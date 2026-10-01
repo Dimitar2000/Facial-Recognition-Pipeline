@@ -1,5 +1,7 @@
 #include "fr_detection_metadata.hpp"
 
+#include <new>
+
 GType fr_detection_meta_api_get_type(void)
 {
     static GType type = 0;
@@ -39,8 +41,7 @@ const GstMetaInfo * fr_detection_meta_get_info(void)
 gboolean fr_detection_meta_init(GstMeta *meta, gpointer params, GstBuffer *buffer)
 {
     FRDetectionMetadata *m = (FRDetectionMetadata *)meta;
-
-    m->detected_faces.clear();
+    new (&m->detected_faces) std::vector<DetectedFace>();
 
     return TRUE;
 }
@@ -49,8 +50,7 @@ void fr_detection_meta_free(GstMeta *meta, GstBuffer *buffer)
 {
     FRDetectionMetadata *m = (FRDetectionMetadata *)meta;
 
-    /* free dynamically allocated members here */
-    m->detected_faces.clear();
+    m->detected_faces.~vector<DetectedFace>();
 }
 
 gboolean fr_detection_meta_transform(GstBuffer *dest,

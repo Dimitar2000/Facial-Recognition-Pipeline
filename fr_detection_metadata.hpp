@@ -4,6 +4,7 @@
 #include <opencv2/core/types.hpp>
 #include <optional>
 #include <string>
+#include <vector>
 
 typedef struct Identity {
     std::string name;
