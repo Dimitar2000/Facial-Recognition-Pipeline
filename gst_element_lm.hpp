@@ -3,8 +3,8 @@
 #include <gst/gstbin.h>
 #include <gst/gstelement.h>
 #include <gst/gstutils.h>
+#include <iostream>
 #include <stdexcept>
-#include <vector>
 
 // Helper Life Management class for GstElement
 // It takes care of unrefing the GstElement when it goes out of scope
@@ -43,7 +43,11 @@ class GstElementLM {
 
         ~GstElementLM() {
             if (element) {
+                std::cout << "Unrefing GstElement: " << GST_ELEMENT_NAME(element) << std::endl;
                 gst_object_unref(element);
+            }
+            else {
+                std::cout << "Skipping unrefing GstElement since it is null" << std::endl;
             }
         }
 
