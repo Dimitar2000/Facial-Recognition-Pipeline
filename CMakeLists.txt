@@ -19,7 +19,14 @@ foreach(dependency IN LISTS PKG_CONFIG_DEPENDENCIES)
 	list(APPEND DEPENDENCY_TARGETS PkgConfig::${dependency_id})
 endforeach()
 
-add_executable(facial-recog-pipeline main.cpp fr_transformer.cpp debug.cpp yaml_util.cpp)
+add_executable(facial-recog-pipeline 
+			   main.cpp 
+			   fr_transformer.cpp 
+			   fr_detection_metadata.cpp
+			   yaml_util.cpp
+			   debug.cpp  
+)
+
 target_link_libraries(facial-recog-pipeline PRIVATE ${DEPENDENCY_TARGETS})
 
 
