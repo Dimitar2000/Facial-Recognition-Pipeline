@@ -10,6 +10,7 @@
 #include <opencv2/imgproc.hpp>
 #include <string>
 
+#include "fr_detection_metadata.hpp"
 #include "yaml_util.hpp"
 
 #define RECORD_START(el, b) (b = gst_element_get_current_running_time(el))
@@ -26,7 +27,7 @@ typedef struct _GstFRTransformer {
 
 G_DEFINE_TYPE (GstFRTransformer, gst_fr_transformer, GST_TYPE_ELEMENT);
 
-static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, int scaled_width);
+static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, int scaled_width, FRDetectionMetadata *metadata);
 
 static void gst_fr_transformer_class_init(GstFRTransformerClass * klass)
 {
@@ -177,7 +178,9 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
                   data,
                   stride);
 
-        detect_and_bind_box(transformer, f, 1024);
+        FRDetectionMetadata *metadata = (FRDetectionMetadata *)gst_buffer_add_meta(buf, FR_DETECTION_META_INFO, NULL);
+
+        detect_and_bind_box(transformer, f, 1024, metadata);
 
         gst_video_frame_unmap(&frame);
     }
@@ -192,7 +195,7 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
     return gst_pad_push (transformer->srcpad, buf);
 }
 
-static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, int scaled_width)
+static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, int scaled_width, FRDetectionMetadata *metadata)
 {
     GstElement  *el = GST_ELEMENT(transformer);
     GstClockTime clock_time_base;
@@ -228,6 +231,7 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
         return;
     }
 
+    // Process each detected face
     for (int i = 0; i < faces.rows; i++)
     {
         cv::Mat face = faces.row(i);
@@ -243,13 +247,13 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
                                               embedding);
         RECORD_END(el, clock_time_base, "Embedding");
 
-        int best_matches            = 0;
-        int best_matches_num_imgs   = 0;
-        double best_match_min       = MAXFLOAT;
-         double best_match_max       = 0;
-        double min                  = MAXFLOAT;
-        double max                  = 0;
-        std::string best_match_name = "Unknown";
+        int best_matches                       = 0;
+        int best_matches_ref_images            = 0;
+        double best_matches_min_similarity     = MAXFLOAT;
+        double best_matches_max_similarity     = 0;
+        double min_similarity                  = MAXFLOAT;
+        double max_similarity                  = 0;
+        std::string best_match_name            = "Unknown";
 
         RECORD_START(el, clock_time_base);
         for (const auto& [name, ref_embeddings]: transformer->face_database)
@@ -266,23 +270,27 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
 
                 if (similarity >= 0.5)
                 {
+                    // There is a match
                     matches++;
 
+                    // Keep track of min and max similarity among all matches
                     if (similarity > match_max) match_max = similarity;
                     if (similarity < match_min) match_min = similarity;
                 }
 
-                if (similarity > max) max = similarity;
-                if (similarity < min) min = similarity;
+                // Keep track of min and max similarity among all embeddings
+                if (similarity > max_similarity) max_similarity = similarity;
+                if (similarity < min_similarity) min_similarity = similarity;
             }
 
+            // This person has more matches against their reference embeddings
             if (matches > best_matches)
             {
                 best_matches = matches;
-                best_matches_num_imgs = ref_embeddings.size();
+                best_matches_ref_images = ref_embeddings.size();
+                best_matches_min_similarity = match_min;
+                best_matches_max_similarity = match_max;
                 best_match_name = name;
-                best_match_max = match_max;
-                best_match_min = match_min;
             }
         }
         RECORD_END(el, clock_time_base, "Matching");
@@ -309,8 +317,9 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
 
         std::vector<gchar *> metadata_lines = {
             g_strdup_printf("%s", best_match_name.c_str()),
-            g_strdup_printf("%i/%i", best_matches, best_matches_num_imgs),
-            g_strdup_printf("(%.3g, %.3g)", best_matches ? best_match_min : min, best_matches ? best_match_max : max),
+            g_strdup_printf("%i/%i", best_matches, best_matches_ref_images),
+            g_strdup_printf("(%.3g, %.3g)", best_matches ? best_matches_min_similarity : min_similarity, 
+                                                       best_matches ? best_matches_max_similarity : max_similarity),
         };
 
         for (int i = 0; i < metadata_lines.size(); i++)
@@ -319,9 +328,23 @@ static void detect_and_bind_box(GstFRTransformer * transformer, cv::Mat& frame, 
                     cv::Point2d(static_cast<int>(face_scaled_rect.x), static_cast<int>(face_scaled_rect.y - i * 40)),
                     cv::FONT_HERSHEY_PLAIN,
                     3, {255, 0, 0}, 2);
-
-            g_free(metadata_lines[i]);
         }
-    }
 
+        // Add the metadata for the detected face
+        DetectedFace face_metadata = {
+            original_size, 
+            face_scaled_rect,
+            min_similarity,
+            max_similarity,
+            (best_matches > 0) ? std::make_optional<Identity>(Identity{
+                best_match_name,
+                best_matches,
+                best_matches_ref_images,
+                best_matches_min_similarity,
+                best_matches_max_similarity
+            }) : std::nullopt
+        };
+
+        metadata->detected_faces.push_back(face_metadata);
+    }
 }
