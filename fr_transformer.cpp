@@ -1,6 +1,7 @@
 #include "fr_transformer.hpp"
 
 #include <cmath>
+#include <gst/gstmemory.h>
 #include <iostream>
 
 #include <gst/gstclock.h>
@@ -166,9 +167,22 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
     guint height = GST_VIDEO_INFO_HEIGHT(&info);
     guint stride = GST_VIDEO_INFO_PLANE_STRIDE(&info, 0);
 
+    // Get a writable copy of the buffer to attach metadata to it. 
+    buf = gst_buffer_make_writable(buf);
+    
+    if (!buf)
+    {
+        gst_caps_unref(caps);
+        return GST_FLOW_ERROR;
+    }
+
+    // Initialize the metadata for detected faces
+    FRDetectionMetadata *metadata = (FRDetectionMetadata *)gst_buffer_add_meta(buf, FR_DETECTION_META_INFO, NULL);
+
+    // Map the buffer to a GstVideoFrame for OpenCV processing
     GstVideoFrame frame;
 
-    if (gst_video_frame_map(&frame, &info, buf, GST_MAP_READ)) {
+    if (gst_video_frame_map(&frame, &info, buf, GST_MAP_READWRITE)) {
 
         guint8 *data = (guint8 *)GST_VIDEO_FRAME_PLANE_DATA(&frame, 0);
 
@@ -177,8 +191,6 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
                   CV_8UC3,
                   data,
                   stride);
-
-        FRDetectionMetadata *metadata = (FRDetectionMetadata *)gst_buffer_add_meta(buf, FR_DETECTION_META_INFO, NULL);
 
         detect_and_bind_box(transformer, f, 1024, metadata);
 
