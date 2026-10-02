@@ -31,6 +31,7 @@ add_executable(facial-recog-pipeline
 			   src/pipeline/webcam_fr_pipeline.hpp
 			   src/pipeline/mp4_fr_pipeline.hpp
 			   src/pipeline/fr_element.hpp
+			   src/util/record.hpp
 )
 
 target_include_directories(facial-recog-pipeline PRIVATE src/)

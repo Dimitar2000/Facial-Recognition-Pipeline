@@ -1,6 +1,5 @@
 #include "fr_processor.hpp"
 
-#include <chrono>
 #include <cstdio>
 #include <iostream>
 #include <optional>
@@ -9,6 +8,7 @@
 #include <opencv2/core/types.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "util/record.hpp"
 #include "util/yaml.hpp"
 
 FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
@@ -26,7 +26,8 @@ FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
     face_detector = cv::FaceDetectorYN::create(yunet_model_file_path,
                                                "",
                                                cv::Size(0, 0));
-    face_recogniser = cv::FaceRecognizerSF::create(sface_model_file_path, "");
+    face_recogniser = cv::FaceRecognizerSF::create(sface_model_file_path, 
+                                                   "");
 
     std::cout << "Loaded facial recognition models." << std::endl;
 }
@@ -34,15 +35,7 @@ FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
 std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame, int scaled_width)
 {
     std::vector<DetectedFace> detected_faces;
-
-    using Clock = std::chrono::steady_clock;
-    const auto record_end = [](const char *label, Clock::time_point start)
-    {
-        const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count();
-        std::printf("%-20s: %11lld\n", label, static_cast<long long>(elapsed));
-    };
-
-    auto clock_time_base = Clock::now();
+    TimeRecorder time_recorder;
 
     cv::Size original_size = {frame.cols, frame.rows};
     cv::Size scaled_size = {scaled_width, static_cast<int>(scaled_width / original_size.aspectRatio())};
@@ -52,7 +45,6 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
     if (!scaled_size.empty() && scaled_size.area() < original_size.area())
     {
         cv::resize(frame, scaled_frame, scaled_size);
-        record_end("Rescaling", clock_time_base);
     }
     else
     {
@@ -61,10 +53,10 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
     }
 
     face_detector->setInputSize(scaled_frame.size());
-
-    clock_time_base = Clock::now();
+    
+    time_recorder.start("Detection");
     face_detector->detect(scaled_frame, faces);
-    record_end("Detection", clock_time_base);
+    time_recorder.stop();
 
     if (faces.empty())
     {
@@ -80,9 +72,9 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
 
         face_recogniser->alignCrop(scaled_frame, face, aligned_face);
 
-        clock_time_base = Clock::now();
+        time_recorder.start("Embedding");
         face_recogniser->feature(aligned_face, embedding);
-        record_end("Embedding", clock_time_base);
+        time_recorder.stop();
 
         int best_matches = 0;
         int best_matches_ref_images = 0;
@@ -92,7 +84,7 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
         double max_similarity = 0;
         std::string best_match_name = "Unknown";
 
-        clock_time_base = Clock::now();
+        time_recorder.start("Matching");
         for (const auto& [name, ref_embeddings] : face_database)
         {
             int matches = 0;
@@ -125,7 +117,7 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
                 best_match_name = name;
             }
         }
-        record_end("Matching", clock_time_base);
+        time_recorder.stop();
 
         float x = face.at<float>(0, 0);
         float y = face.at<float>(0, 1);

@@ -9,9 +9,7 @@
 
 #include "fr/fr_processor.hpp"
 #include "fr_detection_metadata.hpp"
-
-#define RECORD_START(el, b) (b = gst_element_get_current_running_time(el))
-#define RECORD_END(el, b, msg) (g_print("%-20s: %11lu\n", msg, gst_element_get_current_running_time(el) - b))
+#include "util/record.hpp"
 
 typedef struct _FRElement {
     GstElement element;
@@ -114,6 +112,7 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
 {
     FRElement *element = GST_FR_ELEMENT(parent);
     GstElement *element_gst = GST_ELEMENT(parent);
+    TimeRecorder time_recorder;
 
     if (element->remaining_skips > 0)
     {
@@ -123,8 +122,7 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
 
     element->remaining_skips = element->skips;
 
-    GstClockTime clock_time_start;
-    RECORD_START(element_gst, clock_time_start);
+    time_recorder.start("Total");
 
     GstCaps *caps = gst_pad_get_current_caps(pad);
     if (!caps)
@@ -166,13 +164,14 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
         }
 
         metadata->detected_faces = element->processor->process_frame(image, 1024);
+
         gst_video_frame_unmap(&frame);
     }
 
     gst_caps_unref(caps);
 
-    RECORD_END(element_gst, clock_time_start, "Total");
-    std::cout << std::endl;
+    time_recorder.stop();
+    std::cout << "==========" << std::endl;
 
     return gst_pad_push(element->srcpad, buf);
 }
