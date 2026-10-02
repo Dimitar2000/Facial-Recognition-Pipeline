@@ -24,7 +24,6 @@ add_executable(facial-recog-pipeline
 			   fr_transformer.cpp 
 			   fr_detection_metadata.cpp
 			   yaml_util.cpp
-			   debug.cpp  
 )
 
 target_link_libraries(facial-recog-pipeline PRIVATE ${DEPENDENCY_TARGETS})

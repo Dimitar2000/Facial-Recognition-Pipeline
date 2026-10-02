@@ -9,7 +9,6 @@
 #include <memory>
 #include <opencv2/objdetect/face.hpp>
 
-#include "debug.h"
 #include "fr_transformer.hpp"
 #include "fr_pipeline.hpp"
 
