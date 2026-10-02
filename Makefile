@@ -7,7 +7,7 @@
 YUNET 		 = models/face_detection_yunet_2026may.onnx
 SFACE 		 = models/face_recognition_sface_2021dec.onnx
 FACE_DATASET = dataset/
-EMBEDDINGS 	 = dataset_embeddings/embeddings.yaml
+EMBEDDINGS 	 = $(FACE_DATASET)/embeddings.yaml
 
 $(EMBEDDINGS): 
 	python compute_embeddings.py    \
