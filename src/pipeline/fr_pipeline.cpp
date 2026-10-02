@@ -20,10 +20,10 @@ FRPipeline::FRPipeline(double target_fps,
     GstElementLM video_convert2(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_TO_SINK));
     GstElementLM sink(gst_element_factory_make("autovideosink", EL_SINK));
 
-    gst_fr_transformer_load_models(GST_FR_TRANSFORMER(fr_transformer.get()),
-                                   face_dataset_file_path,
-                                   yunet_model_file_path,
-                                   sface_model_file_path);
+    gst_fr_transformer_init_processor(GST_FR_TRANSFORMER(fr_transformer.get()),
+                                      face_dataset_file_path,
+                                      yunet_model_file_path,
+                                      sface_model_file_path);
 
     pipeline.add_to_pipeline(std::move(video_convert));
     pipeline.add_to_pipeline(std::move(fr_transformer));

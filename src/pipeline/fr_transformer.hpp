@@ -14,18 +14,18 @@ G_DECLARE_FINAL_TYPE(
     GstElement
 )
 
-void gst_fr_transformer_load_models(GstFRTransformer * transformer,
-                                    const std::string& face_dataset_file_path,
-                                    const std::string& yunet_model_file_path,
-                                    const std::string& sface_model_file_path);
+void gst_fr_transformer_init_processor(GstFRTransformer *transformer,
+                                       const std::string& face_dataset_file_path,
+                                       const std::string& yunet_model_file_path,
+                                       const std::string& sface_model_file_path);
 
-void gst_fr_transformer_set_skips(GstFRTransformer * transformer,
+void gst_fr_transformer_set_skips(GstFRTransformer *transformer,
                                   guint skips);
 
-gboolean gst_fr_transformer_sink_event (GstPad *pad, 
-                                        GstObject *parent, 
-                                        GstEvent *event);
+gboolean gst_fr_transformer_sink_event(GstPad *pad,
+                                       GstObject *parent,
+                                       GstEvent *event);
 
-GstFlowReturn gst_fr_transformer_chain (GstPad *pad, 
-                                        GstObject *parent, 
-                                        GstBuffer *buf);
+GstFlowReturn gst_fr_transformer_chain(GstPad *pad,
+                                       GstObject *parent,
+                                       GstBuffer *buf);

@@ -4,10 +4,6 @@
 #include <string>
 #include <vector>
 
-struct FaceEmbeddings
-{
-    std::string name;
-    std::vector<cv::Mat> embeddings; 
-};
+#include "fr/face_embeddings.hpp"
 
 std::vector<FaceEmbeddings> parse_yaml_embeddings(std::string file_path);
