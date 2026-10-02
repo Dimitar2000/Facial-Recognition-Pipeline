@@ -23,14 +23,14 @@ add_executable(facial-recog-pipeline
 			   src/main.cpp 
 			   src/pipeline/fr_pipeline.cpp
 			   src/pipeline/mp4_fr_pipeline.cpp
-			   src/pipeline/fr_element.cpp
-			   src/pipeline/fr_detection_metadata.cpp
+			   src/pipeline/elements/fr_element.cpp
+			   src/pipeline/metadata/fr_detection_metadata.cpp
 			   src/pipeline/webcam_fr_pipeline.cpp
 			   src/fr/fr_processor.cpp
 			   src/util/yaml.cpp
 			   src/pipeline/webcam_fr_pipeline.hpp
 			   src/pipeline/mp4_fr_pipeline.hpp
-			   src/pipeline/fr_element.hpp
+			   src/pipeline/elements/fr_element.hpp
 			   src/util/record.hpp
 )
 

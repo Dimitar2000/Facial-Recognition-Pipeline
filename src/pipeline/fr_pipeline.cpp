@@ -5,7 +5,7 @@
 #include <iostream>
 #include <utility>
 
-#include "fr_element.hpp"
+#include "elements/fr_element.hpp"
 
 FRPipeline::FRPipeline(double target_fps,
                        std::string face_dataset_file_path,

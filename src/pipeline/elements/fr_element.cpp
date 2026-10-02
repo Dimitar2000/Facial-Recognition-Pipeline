@@ -8,7 +8,7 @@
 #include <gst/video/video-info.h>
 
 #include "fr/fr_processor.hpp"
-#include "fr_detection_metadata.hpp"
+#include "pipeline/metadata/fr_detection_metadata.hpp"
 #include "util/record.hpp"
 
 typedef struct _FRElement {

@@ -4,7 +4,7 @@
 #include <string>
 #include <gst/gst.h>
 
-#include "pipeline/fr_element.hpp"
+#include "pipeline/elements/fr_element.hpp"
 #include "pipeline/fr_pipeline.hpp"
 #include "pipeline/mp4_fr_pipeline.hpp"
 #include "pipeline/webcam_fr_pipeline.hpp"
