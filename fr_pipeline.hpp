@@ -4,6 +4,7 @@
 #include <gst/gstobject.h>
 #include <gst/gstpipeline.h>
 #include <gst/gstutils.h>
+#include <gst/gstvalue.h>
 #include <string>
 
 #include "config_calculator.hpp"
@@ -107,27 +108,53 @@ class FRPipeline
                                                                       1 * GST_MSECOND,
                                                                       200 * GST_MSECOND);
             
-            std::cout << "[Configuration] Computed FR skip queue size: " << slots << std::endl;
+            std::cout << "[Configuration] Configuring skip queue with " << slots << " slots" << std::endl;
 
             // Create queue
             GstElementLM queue(gst_element_factory_make ("queue", EL_FR_SKIP_QUEUE));
 
-            // Configure queue buffers
+            // Configure queue buffers5
             g_object_set(queue.get(),
                          "max-size-buffers", slots,
                          "max-size-bytes", 0,
                          "max-size-time", 0,
                          nullptr);
 
+            // Configure transformer skipping slots
+            std::cout << "[Configuration] Configuring FR transformer to skip " << slots - 1 << " frames" << std::endl;
+
             auto *transformer = GST_FR_TRANSFORMER(pipeline.get_by_name(EL_FR_TRANSFORMER));
             gst_fr_transformer_set_skips(transformer, slots - 1);
-            
-            // Insert queue between FR transformer and next element
-            pipeline.add_to_pipeline(std::move(queue));
+
+            // Create new elements for keeping constant framerate 
+            std::cout << "[Configuration] Configuring framerate pair with FPS = " << target_fps << std::endl;
+
+            GstElementLM videorate(gst_element_factory_make("videorate", EL_FRAMERATE));
+            GstElementLM capsfilter(gst_element_factory_make("capsfilter", EL_FRAMERATE_FILTER));
+
+            // Configure desired output FPS.
+            GstCapsLM caps(gst_caps_new_simple("video/x-raw",
+                                               "framerate",
+                                               GST_TYPE_FRACTION,
+                                               static_cast<guint>(target_fps * 100),
+                                               100,
+                                               nullptr));
+
+            g_object_set(capsfilter.get(), "caps", caps.get(), nullptr);
+
+            // Insert new components between FR transformer and next element
+            std::cout << "[Configuration] Inserting new elements" << std::endl;
+
             pipeline.unlink_elements(EL_FR_TRANSFORMER, EL_VIDEO_CONVERT_TO_SINK);
 
+            pipeline.add_to_pipeline(std::move(queue));
+            pipeline.add_to_pipeline(std::move(videorate));
+            pipeline.add_to_pipeline(std::move(capsfilter));
+
             pipeline.link_elements(EL_FR_TRANSFORMER, EL_FR_SKIP_QUEUE);
-            pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_VIDEO_CONVERT_TO_SINK);          
+            pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);
+            pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
+            pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);
         }
 
     protected:
@@ -137,10 +164,12 @@ class FRPipeline
 
         const char * EL_PIPELINE                  = "pipeline";
         const char * EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";
-        const char * EL_FR_TRANSFORMER            = "facial-recognition-transformer";
+        const char * EL_FR_TRANSFORMER            = "facial_recognition_transformer";
+        const char * EL_FR_SKIP_QUEUE             = "fr_skip_queue";
+        const char * EL_FRAMERATE                 = "framerate";
+        const char * EL_FRAMERATE_FILTER          = "capsfilter_fps";
         const char * EL_VIDEO_CONVERT_TO_SINK     = "video_convert_to_sink";
         const char * EL_SINK                      = "sink";
-        const char * EL_FR_SKIP_QUEUE             = "fr_skip_queue";
 };
 
 class WebcamFRPipeline: public FRPipeline
