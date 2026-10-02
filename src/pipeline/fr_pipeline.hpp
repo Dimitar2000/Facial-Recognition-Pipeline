@@ -30,7 +30,7 @@ class FRPipeline
 
         const char * EL_PIPELINE                  = "pipeline";
         const char * EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";
-        const char * EL_FR_TRANSFORMER            = "facial_recognition_transformer";
+        const char * EL_FR_ELEMENT                = "facial_recognition_element";
         const char * EL_FR_SKIP_QUEUE             = "fr_skip_queue";
         const char * EL_FRAMERATE                 = "framerate";
         const char * EL_FRAMERATE_FILTER          = "capsfilter_fps";

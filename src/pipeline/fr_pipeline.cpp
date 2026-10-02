@@ -5,7 +5,7 @@
 #include <iostream>
 #include <utility>
 
-#include "fr_transformer.hpp"
+#include "fr_element.hpp"
 
 FRPipeline::FRPipeline(double target_fps,
                        std::string face_dataset_file_path,
@@ -16,22 +16,22 @@ FRPipeline::FRPipeline(double target_fps,
     pipeline = GstPipelineLM(gst_pipeline_new(EL_PIPELINE));
 
     GstElementLM video_convert(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_FROM_SOURCE));
-    GstElementLM fr_transformer(gst_element_factory_make("fr-transformer", EL_FR_TRANSFORMER));
+    GstElementLM fr_element(gst_element_factory_make("fr-element", EL_FR_ELEMENT));
     GstElementLM video_convert2(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_TO_SINK));
     GstElementLM sink(gst_element_factory_make("autovideosink", EL_SINK));
 
-    gst_fr_transformer_init_processor(GST_FR_TRANSFORMER(fr_transformer.get()),
-                                      face_dataset_file_path,
-                                      yunet_model_file_path,
-                                      sface_model_file_path);
+    gst_fr_element_init_processor(GST_FR_ELEMENT(fr_element.get()),
+                                  face_dataset_file_path,
+                                  yunet_model_file_path,
+                                  sface_model_file_path);
 
     pipeline.add_to_pipeline(std::move(video_convert));
-    pipeline.add_to_pipeline(std::move(fr_transformer));
+    pipeline.add_to_pipeline(std::move(fr_element));
     pipeline.add_to_pipeline(std::move(video_convert2));
     pipeline.add_to_pipeline(std::move(sink));
 
-    pipeline.link_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_FR_TRANSFORMER);
-    pipeline.link_elements(EL_FR_TRANSFORMER, EL_VIDEO_CONVERT_TO_SINK);
+    pipeline.link_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_FR_ELEMENT);
+    pipeline.link_elements(EL_FR_ELEMENT, EL_VIDEO_CONVERT_TO_SINK);
     pipeline.link_elements(EL_VIDEO_CONVERT_TO_SINK, EL_SINK);
 
     if (target_fps != 0.0)
@@ -58,10 +58,10 @@ void FRPipeline::extend_for_stable_fps()
                  "max-size-time", 0,
                  nullptr);
 
-    std::cout << "[Configuration] Configuring FR transformer to skip " << slots - 1 << " frames" << std::endl;
+    std::cout << "[Configuration] Configuring FR element to skip " << slots - 1 << " frames" << std::endl;
 
-    auto *transformer = GST_FR_TRANSFORMER(pipeline.get_by_name(EL_FR_TRANSFORMER));
-    gst_fr_transformer_set_skips(transformer, slots - 1);
+    auto *element = GST_FR_ELEMENT(pipeline.get_by_name(EL_FR_ELEMENT));
+    gst_fr_element_set_skips(element, slots - 1);
 
     std::cout << "[Configuration] Configuring framerate pair with FPS = " << target_fps << std::endl;
 
@@ -79,13 +79,13 @@ void FRPipeline::extend_for_stable_fps()
 
     std::cout << "[Configuration] Inserting new elements" << std::endl;
 
-    pipeline.unlink_elements(EL_FR_TRANSFORMER, EL_VIDEO_CONVERT_TO_SINK);
+    pipeline.unlink_elements(EL_FR_ELEMENT, EL_VIDEO_CONVERT_TO_SINK);
 
     pipeline.add_to_pipeline(std::move(queue));
     pipeline.add_to_pipeline(std::move(videorate));
     pipeline.add_to_pipeline(std::move(capsfilter));
 
-    pipeline.link_elements(EL_FR_TRANSFORMER, EL_FR_SKIP_QUEUE);
+    pipeline.link_elements(EL_FR_ELEMENT, EL_FR_SKIP_QUEUE);
     pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);
     pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
     pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);

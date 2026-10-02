@@ -1,4 +1,4 @@
-#include "fr_transformer.hpp"
+#include "fr_element.hpp"
 
 #include <iostream>
 #include <string>
@@ -13,32 +13,32 @@
 #define RECORD_START(el, b) (b = gst_element_get_current_running_time(el))
 #define RECORD_END(el, b, msg) (g_print("%-20s: %11lu\n", msg, gst_element_get_current_running_time(el) - b))
 
-typedef struct _GstFRTransformer {
+typedef struct _FRElement {
     GstElement element;
     GstPad *sinkpad, *srcpad;
     FRProcessor *processor;
     guint skips;
     guint remaining_skips;
-} GstFRTransformer;
+} FRElement;
 
-G_DEFINE_TYPE(GstFRTransformer, gst_fr_transformer, GST_TYPE_ELEMENT);
+G_DEFINE_TYPE(FRElement, gst_fr_element, GST_TYPE_ELEMENT);
 
-static void gst_fr_transformer_finalize(GObject *object)
+static void gst_fr_element_finalize(GObject *object)
 {
-    GstFRTransformer *transformer = GST_FR_TRANSFORMER(object);
-    delete transformer->processor;
-    G_OBJECT_CLASS(gst_fr_transformer_parent_class)->finalize(object);
+    FRElement *element = GST_FR_ELEMENT(object);
+    delete element->processor;
+    G_OBJECT_CLASS(gst_fr_element_parent_class)->finalize(object);
 }
 
-static void gst_fr_transformer_class_init(GstFRTransformerClass *klass)
+static void gst_fr_element_class_init(FRElementClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
-    object_class->finalize = gst_fr_transformer_finalize;
+    object_class->finalize = gst_fr_element_finalize;
 
     GstElementClass *element_class = GST_ELEMENT_CLASS(klass);
 
     gst_element_class_set_static_metadata(element_class,
-        "Facial recognition transformer",
+        "Facial recognition element",
         "Filter/Effect/Video",
         "Detects and identifies faces in video frames",
         "dimitar-barantiev");
@@ -60,14 +60,14 @@ static void gst_fr_transformer_class_init(GstFRTransformerClass *klass)
     gst_caps_unref(caps);
 }
 
-static void gst_fr_transformer_init(GstFRTransformer *element)
+static void gst_fr_element_init(FRElement *element)
 {
     GstElementClass *klass = GST_ELEMENT_GET_CLASS(element);
 
     element->sinkpad = gst_pad_new_from_template(
         gst_element_class_get_pad_template(klass, "sink"), "sink");
-    gst_pad_set_chain_function(element->sinkpad, gst_fr_transformer_chain);
-    gst_pad_set_event_function(element->sinkpad, gst_fr_transformer_sink_event);
+    gst_pad_set_chain_function(element->sinkpad, gst_fr_element_chain);
+    gst_pad_set_event_function(element->sinkpad, gst_fr_element_sink_event);
     gst_element_add_pad(GST_ELEMENT(element), element->sinkpad);
 
     element->srcpad = gst_pad_new_from_template(
@@ -79,49 +79,49 @@ static void gst_fr_transformer_init(GstFRTransformer *element)
     element->remaining_skips = 0;
 }
 
-void gst_fr_transformer_init_processor(GstFRTransformer *transformer,
-                                       const std::string& face_dataset_file_path,
-                                       const std::string& yunet_model_file_path,
-                                       const std::string& sface_model_file_path)
+void gst_fr_element_init_processor(FRElement *element,
+                                   const std::string& face_dataset_file_path,
+                                   const std::string& yunet_model_file_path,
+                                   const std::string& sface_model_file_path)
 {
-    delete transformer->processor;
-    transformer->processor = new FRProcessor(face_dataset_file_path,
-                                             yunet_model_file_path,
-                                             sface_model_file_path);
+    delete element->processor;
+    element->processor = new FRProcessor(face_dataset_file_path,
+                                         yunet_model_file_path,
+                                         sface_model_file_path);
 }
 
-void gst_fr_transformer_set_skips(GstFRTransformer *transformer, guint skips)
+void gst_fr_element_set_skips(FRElement *element, guint skips)
 {
-    transformer->skips = skips;
-    transformer->remaining_skips = skips;
+    element->skips = skips;
+    element->remaining_skips = skips;
 }
 
-gboolean gst_fr_transformer_sink_event(GstPad *pad, GstObject *parent, GstEvent *event)
+gboolean gst_fr_element_sink_event(GstPad *pad, GstObject *parent, GstEvent *event)
 {
-    GstFRTransformer *transformer = GST_FR_TRANSFORMER(parent);
+    FRElement *element = GST_FR_ELEMENT(parent);
 
     switch (GST_EVENT_TYPE(event))
     {
     case GST_EVENT_CAPS:
-        return gst_pad_push_event(transformer->srcpad, event);
+        return gst_pad_push_event(element->srcpad, event);
     case GST_EVENT_EOS:
     default:
         return gst_pad_event_default(pad, parent, event);
     }
 }
 
-GstFlowReturn gst_fr_transformer_chain(GstPad *pad, GstObject *parent, GstBuffer *buf)
+GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *buf)
 {
-    GstFRTransformer *transformer = GST_FR_TRANSFORMER(parent);
+    FRElement *element = GST_FR_ELEMENT(parent);
     GstElement *element_gst = GST_ELEMENT(parent);
 
-    if (transformer->remaining_skips > 0)
+    if (element->remaining_skips > 0)
     {
-        transformer->remaining_skips--;
-        return gst_pad_push(transformer->srcpad, buf);
+        element->remaining_skips--;
+        return gst_pad_push(element->srcpad, buf);
     }
 
-    transformer->remaining_skips = transformer->skips;
+    element->remaining_skips = element->skips;
 
     GstClockTime clock_time_start;
     RECORD_START(element_gst, clock_time_start);
@@ -129,7 +129,7 @@ GstFlowReturn gst_fr_transformer_chain(GstPad *pad, GstObject *parent, GstBuffer
     GstCaps *caps = gst_pad_get_current_caps(pad);
     if (!caps)
     {
-        return gst_pad_push(transformer->srcpad, buf);
+        return gst_pad_push(element->srcpad, buf);
     }
 
     GstVideoInfo info;
@@ -158,14 +158,14 @@ GstFlowReturn gst_fr_transformer_chain(GstPad *pad, GstObject *parent, GstBuffer
         guint8 *data = static_cast<guint8 *>(GST_VIDEO_FRAME_PLANE_DATA(&frame, 0));
         cv::Mat image(height, width, CV_8UC3, data, stride);
 
-        if (!transformer->processor)
+        if (!element->processor)
         {
             gst_video_frame_unmap(&frame);
             gst_caps_unref(caps);
             return GST_FLOW_ERROR;
         }
 
-        transformer->processor->process_frame(image, 1024, metadata);
+        element->processor->process_frame(image, 1024, metadata);
         gst_video_frame_unmap(&frame);
     }
 
@@ -174,5 +174,5 @@ GstFlowReturn gst_fr_transformer_chain(GstPad *pad, GstObject *parent, GstBuffer
     RECORD_END(element_gst, clock_time_start, "Total");
     std::cout << std::endl;
 
-    return gst_pad_push(transformer->srcpad, buf);
+    return gst_pad_push(element->srcpad, buf);
 }

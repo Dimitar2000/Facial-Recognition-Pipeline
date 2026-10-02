@@ -23,14 +23,14 @@ add_executable(facial-recog-pipeline
 			   src/main.cpp 
 			   src/pipeline/fr_pipeline.cpp
 			   src/pipeline/mp4_fr_pipeline.cpp
-			   src/pipeline/fr_transformer.cpp
+			   src/pipeline/fr_element.cpp
 			   src/pipeline/fr_detection_metadata.cpp
 			   src/pipeline/webcam_fr_pipeline.cpp
 			   src/fr/fr_processor.cpp
 			   src/util/yaml.cpp
 			   src/pipeline/webcam_fr_pipeline.hpp
 			   src/pipeline/mp4_fr_pipeline.hpp
-			   src/pipeline/fr_transformer.hpp
+			   src/pipeline/fr_element.hpp
 )
 
 target_include_directories(facial-recog-pipeline PRIVATE src/)
