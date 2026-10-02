@@ -8,13 +8,14 @@
 #include <gst/audio/audio.h>
 #include <memory>
 #include <opencv2/objdetect/face.hpp>
+#include <string>
 
 #include "fr_transformer.hpp"
 #include "fr_pipeline.hpp"
 
 const std::string HELP_MESSAGE = "Not enough arguments. Format is: \n"
-                                 "  <app> webcam <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path>\n"
-                                 "  <app> mp4    <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path> <input-mp4-file-path>\n";
+                                 "  <app> webcam <fps> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path>\n"
+                                 "  <app> mp4    <fps> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path> <input-mp4-file-path>\n";
 
 int main(int argc, char *argv[])
 {
@@ -29,28 +30,40 @@ int main(int argc, char *argv[])
     }
     
     // Check and parse arguments
-    if (argc < 5)
+    if (argc < 6)
     {
         std::cerr << HELP_MESSAGE << std::endl;
         return 1;
     }
     
     std::string source_type            = argv[1];
-    std::string face_dataset_file_path = argv[2];
-    std::string yunet_model_file_path  = argv[3];
-    std::string sface_model_file_path  = argv[4];
+    std::string target_fps_s           = argv[2];
+    double      target_fps;
+    std::string face_dataset_file_path = argv[3];
+    std::string yunet_model_file_path  = argv[4];
+    std::string sface_model_file_path  = argv[5];
     std::string input_mp4_file_path;
+
+    try 
+    {
+        target_fps = std::stod(target_fps_s);
+    }
+    catch (std::exception e)
+    {
+        std::cerr << "Invalid fps value - not a number - <" << target_fps_s << ">" << std::endl;
+        return 1;
+    }
 
     if (source_type == "mp4")
     {
-        if (argc < 6)
+        if (argc < 7)
         {
             std::cerr << HELP_MESSAGE << std::endl;
             return 1;
         }
         else
         {
-            input_mp4_file_path = argv[5];
+            input_mp4_file_path = argv[6];
         }
     }
     
@@ -63,13 +76,20 @@ int main(int argc, char *argv[])
         {
             std::cout << "Source type is: Camera" << std::endl;
             
-            pipeline = std::make_unique<WebcamFRPipeline>(face_dataset_file_path, yunet_model_file_path, sface_model_file_path);
+            pipeline = std::make_unique<WebcamFRPipeline>(target_fps,
+                                                          face_dataset_file_path, 
+                                                          yunet_model_file_path, 
+                                                          sface_model_file_path);
         }
         else if (source_type == "mp4")
         {
             std::cout << "Source type is: MP4 video file" << std::endl;
                
-            pipeline = std::make_unique<MP4FRPipeline>(face_dataset_file_path, yunet_model_file_path, sface_model_file_path, input_mp4_file_path);
+            pipeline = std::make_unique<MP4FRPipeline>(target_fps,
+                                                       face_dataset_file_path, 
+                                                       yunet_model_file_path, 
+                                                       sface_model_file_path, 
+                                                       input_mp4_file_path);
         }
         else
         {

@@ -26,6 +26,7 @@ run_mp4: $(EMBEDDINGS)
 	make -C build
 	build/facial-recog-pipeline \
 		mp4 					\
+		$(fps)					\
 		$(EMBEDDINGS)  			\
 		$(YUNET) 				\
 		$(SFACE)				\
@@ -35,6 +36,7 @@ run_webcam: $(EMBEDDINGS)
 	make -C build
 	build/facial-recog-pipeline \
 		webcam 					\
+		$(fps)					\
 		$(EMBEDDINGS)  			\
 		$(YUNET) 				\
 		$(SFACE)

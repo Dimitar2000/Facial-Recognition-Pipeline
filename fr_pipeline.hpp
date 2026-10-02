@@ -58,9 +58,11 @@ class FRPipeline
     protected:
         FRPipeline() = default;
 
-        FRPipeline(std::string face_dataset_file_path, 
+        FRPipeline(double target_fps,
+                   std::string face_dataset_file_path, 
                    std::string yunet_model_file_path, 
                    std::string sface_model_file_path)
+            : target_fps(target_fps)
         {
             /* Create the empty pipeline */
             pipeline = GstPipelineLM(gst_pipeline_new ("pipeline"));
@@ -87,17 +89,22 @@ class FRPipeline
         }
 
     protected:
+        double target_fps;
         GstPipelineLM pipeline;
 };
 
 class WebcamFRPipeline: public FRPipeline
 {
     public:
-        WebcamFRPipeline(std::string face_dataset_file_path, 
+        WebcamFRPipeline(double target_fps,
+                         std::string face_dataset_file_path, 
                          std::string yunet_model_file_path, 
                          std::string sface_model_file_path)
         :
-            FRPipeline(face_dataset_file_path, yunet_model_file_path, sface_model_file_path)
+            FRPipeline(target_fps, 
+                       face_dataset_file_path, 
+                       yunet_model_file_path, 
+                       sface_model_file_path)
         {
             // Create the elements
             GstElementLM source(gst_element_factory_make ("v4l2src", "source"));
@@ -127,12 +134,16 @@ class WebcamFRPipeline: public FRPipeline
 class MP4FRPipeline: public FRPipeline
 {
     public:
-        MP4FRPipeline(std::string face_dataset_file_path, 
+        MP4FRPipeline(double target_fps,
+                      std::string face_dataset_file_path, 
                       std::string yunet_model_file_path, 
                       std::string sface_model_file_path,
                       std::string input_mp4_file_path)
         :
-            FRPipeline(face_dataset_file_path, yunet_model_file_path, sface_model_file_path) 
+            FRPipeline(target_fps,
+                       face_dataset_file_path, 
+                       yunet_model_file_path, 
+                       sface_model_file_path) 
         {
             // Create the elements
             GstElementLM source(gst_element_factory_make ("filesrc", "source"));
