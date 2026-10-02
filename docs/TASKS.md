@@ -1,31 +1,39 @@
-* [ ] Preparation
-    * [ ] Choose source type
-    * [ ] Choose OTS model
+* [x] Preparation
+    * [x] Choose source type - MP4
+    * [x] Choose OTS model   - YuNet + SFace 
     * [x] Choose C++ inference framework - OpenCV    
 
-* [ ] Base product
-    * [ ] Record database of faces
-    * [ ] Load source from GStreamer
+* [x] Base product
+    * [x] Record database of faces
+    * [x] Load source from GStreamer
     * [x] Create custom GStreamer element
-    * [ ] Get source stream metadata
     * [x] Get framework
-    * [ ] Instantiate model
-        - [ ] Add model parameters file
-        - [ ] Add face database
-        - [ ] Pass both to model on creation
-    * [ ] Pass each source frame to the model and get result info
-    * [ ] Display result info in terminal
-    * [ ] Test on stream
+    * [x] Instantiate model
+    * [x] Pass each source frame to the model and get result info
+    * [x] Display result info in terminal
+    * [x] Test on stream
 
-* [ ] Create test setup
+* Achieve a stable static FPS. Strategy: skip (N-1) frames for FR -> queue of size N. 
+  Queue size is computed based on provided pipeline + max FR latency.
+    
+    * [x] Version 1 - use a large constant placeholder for max FR latency
+        * [x] Compute configuration for queue and FR components
+        * [x] Configure queue and FR components
+        * [x] Add videorate with caps filter for target FPS
+        * [x] Test how it works for two video resolutions
 
-* [ ] Achieve a stable static RTS
-    * Strategy 1 - static configuration of queue + skip frames based on max FR latency
-        * [ ] Compute max latency of FR before playing
+    * [ ] Version 2 - use wampup to estimate max FR latency 
+        * [ ] Create warmup pipeline setup
+        * [ ] Run T test frames from real source and compute max latency
         * [ ] Compute configuration for queue and FR components
-        * [ ] Configure queue and FR components
-        * [ ] Test how it works for two video resolutions
- 
+        * [ ] Remove warmup pipeline setup
+
+    * [ ] Version 3 - use source FPS as cutoff for target FPS
+
+* [ ] Handle changes in source FPS with caps renegotiation
+
+* [ ] Handle changes in source resolution
+
 Current Issues/Limitations
 ---
 * Pipeline
