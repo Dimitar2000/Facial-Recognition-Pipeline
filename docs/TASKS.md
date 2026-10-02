@@ -33,6 +33,9 @@ Current Issues/Limitations
     - initial frames seem to take longer FR time - cold start?
     - long FR detection and recognition latencies result in stalling and dropping frames at the output
 
+* FR dataset
+    - only one face is in the dataset
+
 * FR quality
     - static detection size - different video resolutions result in different amount of image information loss
     - faces are often not detected despite suitable size and lighting conditions
