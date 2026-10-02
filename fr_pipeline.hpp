@@ -67,13 +67,13 @@ class FRPipeline
             : target_fps(target_fps)
         {
             /* Create the empty pipeline */
-            pipeline = GstPipelineLM(gst_pipeline_new ("pipeline"));
+            pipeline = GstPipelineLM(gst_pipeline_new (EL_PIPELINE));
 
             // Create the common elements
-            GstElementLM video_convert(gst_element_factory_make ("videoconvert", "video_convert"));
-            GstElementLM fr_transformer(gst_element_factory_make ("fr-transformer", "facial-recognition-transformer"));
-            GstElementLM video_convert2(gst_element_factory_make ("videoconvert", "video_convert_2"));
-            GstElementLM sink(gst_element_factory_make ("autovideosink", "sink"));
+            GstElementLM video_convert(gst_element_factory_make ("videoconvert", EL_VIDEO_CONVERT_FROM_SOURCE));
+            GstElementLM fr_transformer(gst_element_factory_make ("fr-transformer", EL_FR_TRANSFORMER));
+            GstElementLM video_convert2(gst_element_factory_make ("videoconvert", EL_VIDEO_CONVERT_TO_SINK));
+            GstElementLM sink(gst_element_factory_make ("autovideosink", EL_SINK));
 
             gst_fr_transformer_load_models(GST_FR_TRANSFORMER(fr_transformer.get()),
                                            face_dataset_file_path,
@@ -85,9 +85,9 @@ class FRPipeline
             pipeline.add_to_pipeline(std::move(video_convert2));
             pipeline.add_to_pipeline(std::move(sink));
 
-            pipeline.link_elements("video_convert", "facial-recognition-transformer");
-            pipeline.link_elements("facial-recognition-transformer", "video_convert_2");
-            pipeline.link_elements("video_convert_2", "sink");
+            pipeline.link_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_FR_TRANSFORMER);
+            pipeline.link_elements(EL_FR_TRANSFORMER, EL_VIDEO_CONVERT_TO_SINK);
+            pipeline.link_elements(EL_VIDEO_CONVERT_TO_SINK, EL_SINK);
 
             // If a stable fps is requested, extend the pipeline with queueing
             if (target_fps != 0.0)
@@ -119,15 +119,15 @@ class FRPipeline
                          "max-size-time", 0,
                          nullptr);
 
-            auto *transformer = GST_FR_TRANSFORMER(pipeline.get_by_name("facial-recognition-transformer"));
+            auto *transformer = GST_FR_TRANSFORMER(pipeline.get_by_name(EL_FR_TRANSFORMER));
             gst_fr_transformer_set_skips(transformer, slots - 1);
             
             // Insert queue between FR transformer and next element
             pipeline.add_to_pipeline(std::move(queue));
-            pipeline.unlink_elements("facial-recognition-transformer", "video_convert_2");
+            pipeline.unlink_elements(EL_FR_TRANSFORMER, EL_VIDEO_CONVERT_TO_SINK);
 
-            pipeline.link_elements("facial-recognition-transformer", EL_FR_SKIP_QUEUE);
-            pipeline.link_elements(EL_FR_SKIP_QUEUE, "video_convert_2");          
+            pipeline.link_elements(EL_FR_TRANSFORMER, EL_FR_SKIP_QUEUE);
+            pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_VIDEO_CONVERT_TO_SINK);          
         }
 
     protected:
@@ -135,7 +135,12 @@ class FRPipeline
         double target_fps;
         GstPipelineLM pipeline;
 
-        const char * EL_FR_SKIP_QUEUE = "fr_skip_queue";
+        const char * EL_PIPELINE                  = "pipeline";
+        const char * EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";
+        const char * EL_FR_TRANSFORMER            = "facial-recognition-transformer";
+        const char * EL_VIDEO_CONVERT_TO_SINK     = "video_convert_to_sink";
+        const char * EL_SINK                      = "sink";
+        const char * EL_FR_SKIP_QUEUE             = "fr_skip_queue";
 };
 
 class WebcamFRPipeline: public FRPipeline
@@ -170,7 +175,7 @@ class WebcamFRPipeline: public FRPipeline
 
             pipeline.link_elements("source", "resolution");
             pipeline.link_elements("resolution", "jpeg_decoder");
-            pipeline.link_elements("jpeg_decoder", "video_convert");
+            pipeline.link_elements("jpeg_decoder", EL_VIDEO_CONVERT_FROM_SOURCE);
         }
 
         ~WebcamFRPipeline() = default;
@@ -203,7 +208,7 @@ class MP4FRPipeline: public FRPipeline
 
             pipeline.link_elements("source", "decoder");
 
-            GstElement* video_convert = pipeline.get_by_name("video_convert");
+            GstElement* video_convert = pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE);
 
             g_signal_connect(pipeline.get_by_name("decoder"), 
                              "pad-added", 
