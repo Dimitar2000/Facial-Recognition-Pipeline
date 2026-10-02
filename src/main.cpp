@@ -6,6 +6,8 @@
 
 #include "pipeline/fr_transformer.hpp"
 #include "pipeline/fr_pipeline.hpp"
+#include "pipeline/mp4_fr_pipeline.hpp"
+#include "pipeline/webcam_fr_pipeline.hpp"
 
 const std::string HELP_MESSAGE = "Not enough arguments. Format is: \n"
                                  "  <app> webcam <fps> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path>\n"
