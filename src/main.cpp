@@ -1,17 +1,11 @@
-#include <exception>
-#include <glib-object.h>
-#include <gst/gstelementfactory.h>
-#include <gst/gstobject.h>
 #include <iostream>
-
-#include <gst/gst.h>
-#include <gst/audio/audio.h>
+#include <exception>
 #include <memory>
-#include <opencv2/objdetect/face.hpp>
 #include <string>
+#include <gst/gst.h>
 
-#include "fr_transformer.hpp"
-#include "fr_pipeline.hpp"
+#include "pipeline/fr_transformer.hpp"
+#include "pipeline/fr_pipeline.hpp"
 
 const std::string HELP_MESSAGE = "Not enough arguments. Format is: \n"
                                  "  <app> webcam <fps> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path>\n"

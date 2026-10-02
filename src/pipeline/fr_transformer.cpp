@@ -1,7 +1,5 @@
 #include "fr_transformer.hpp"
 
-#include <cmath>
-#include <gst/gstmemory.h>
 #include <iostream>
 
 #include <gst/gstclock.h>
@@ -9,11 +7,12 @@
 #include <gst/video/video-info.h>
 #include <opencv2/core/types.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/objdetect/face.hpp>
 #include <stdexcept>
 #include <string>
 
 #include "fr_detection_metadata.hpp"
-#include "yaml_util.hpp"
+#include "util/yaml.hpp"
 
 #define RECORD_START(el, b) (b = gst_element_get_current_running_time(el))
 #define RECORD_END(el, b, msg) (g_print("%-20s: %11lu\n", msg, gst_element_get_current_running_time(el) - b))

@@ -5,6 +5,7 @@
 #include <gst/gstutils.h>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
 // Helper Life Management class for GstElement
 // It takes care of unrefing the GstElement when it goes out of scope

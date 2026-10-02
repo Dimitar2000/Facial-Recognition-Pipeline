@@ -5,7 +5,10 @@
 #include <gst/gstpipeline.h>
 #include <gst/gstutils.h>
 #include <gst/gstvalue.h>
+#include <iostream>
+#include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "config_calculator.hpp"
 #include "fr_transformer.hpp"

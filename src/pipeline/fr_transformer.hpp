@@ -2,7 +2,7 @@
 
 #include "gst/gstelement.h"
 #include "gst/gstpad.h"
-#include <opencv2/objdetect/face.hpp>
+#include <string>
 
 #define GST_TYPE_FR_TRANSFORMER (gst_fr_transformer_get_type())
 

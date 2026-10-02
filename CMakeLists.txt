@@ -20,11 +20,13 @@ foreach(dependency IN LISTS PKG_CONFIG_DEPENDENCIES)
 endforeach()
 
 add_executable(facial-recog-pipeline 
-			   main.cpp 
-			   fr_transformer.cpp 
-			   fr_detection_metadata.cpp
-			   yaml_util.cpp
+			   src/main.cpp 
+			   src/pipeline/fr_transformer.cpp 
+			   src/pipeline/fr_detection_metadata.cpp
+			   src/util/yaml.cpp
 )
+
+target_include_directories(facial-recog-pipeline PRIVATE src/)
 
 target_link_libraries(facial-recog-pipeline PRIVATE ${DEPENDENCY_TARGETS})
 

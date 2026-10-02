@@ -1,11 +1,8 @@
-#include "yaml_util.hpp"
+#include "yaml.hpp"
 
-#include <glib.h>
 #include <iostream>
-#include <jsoncpp/json/reader.h>
-#include <jsoncpp/json/value.h>
-#include <opencv2/core/mat.hpp>
 #include <opencv2/core/persistence.hpp>
+#include <utility>
 
 std::vector<FaceEmbeddings> parse_yaml_embeddings(std::string file_path)
 {
