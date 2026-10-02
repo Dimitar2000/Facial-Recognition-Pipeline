@@ -19,6 +19,9 @@ void gst_fr_transformer_load_models(GstFRTransformer * transformer,
                                     const std::string& yunet_model_file_path,
                                     const std::string& sface_model_file_path);
 
+void gst_fr_transformer_set_skips(GstFRTransformer * transformer,
+                                  guint skips);
+
 gboolean gst_fr_transformer_sink_event (GstPad *pad, 
                                         GstObject *parent, 
                                         GstEvent *event);

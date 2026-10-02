@@ -25,6 +25,9 @@ typedef struct _GstFRTransformer {
     cv::Ptr<cv::FaceDetectorYN> face_detector;
     cv::Ptr<cv::FaceRecognizerSF> face_recogniser;
     std::vector<FaceEmbeddings> face_database;
+
+    guint skips;
+    guint remaining_skips;
 } GstFRTransformer;
 
 G_DEFINE_TYPE (GstFRTransformer, gst_fr_transformer, GST_TYPE_ELEMENT);
@@ -115,6 +118,14 @@ void gst_fr_transformer_load_models(GstFRTransformer * transformer,
 	std::cout << "Loaded facial recognition models." << std::endl;
 }
 
+void gst_fr_transformer_set_skips(GstFRTransformer * transformer,
+                                  guint skip)
+{
+    transformer->skips = skip;
+    transformer->remaining_skips = skip;
+}
+
+
 gboolean gst_fr_transformer_sink_event (GstPad *pad, GstObject *parent, GstEvent  *event)
 {
   gboolean ret;
@@ -143,6 +154,16 @@ GstFlowReturn gst_fr_transformer_chain (GstPad *pad, GstObject *parent, GstBuffe
 {
     GstFRTransformer *transformer    = GST_FR_TRANSFORMER (parent);
     GstElement       *transformer_el = GST_ELEMENT(parent);
+
+    // If we still have frames to skip, just pass the frame forward
+    if (transformer->remaining_skips > 0)
+    {
+        transformer->remaining_skips--;
+        return gst_pad_push (transformer->srcpad, buf);
+    }
+
+    // Process frame and reset skips for next frames
+    transformer->remaining_skips = transformer->skips;
 
     GstClockTime clock_time_start;
 
