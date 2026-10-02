@@ -90,6 +90,9 @@ static void gst_fr_transformer_init (GstFRTransformer *filter)
     /* pad through which data goes out of the element */
     filter->srcpad = gst_pad_new_from_template(gst_element_class_get_pad_template(klass, "src"), "src");
     gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
+
+    filter->skips = 0;
+    filter->remaining_skips = 0;
 }
 
 void gst_fr_transformer_load_models(GstFRTransformer * transformer,
