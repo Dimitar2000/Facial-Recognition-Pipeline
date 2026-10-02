@@ -127,37 +127,15 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
         double sx = static_cast<double>(original_size.width) / scaled_size.width;
         double sy = static_cast<double>(original_size.height) / scaled_size.height;
 
-        cv::Rect face_scaled_rect(
-            cvRound(x * sx),
-            cvRound(y * sy),
-            cvRound(width * sx),
-            cvRound(height * sy));
-
-        cv::rectangle(frame, face_scaled_rect, cv::Scalar(0, 255, 0), 2);
-
-        std::vector<gchar *> metadata_lines = {
-            g_strdup_printf("%s", best_match_name.c_str()),
-            g_strdup_printf("%i/%i", best_matches, best_matches_ref_images),
-            g_strdup_printf("(%.3g, %.3g)", best_matches ? best_matches_min_similarity : min_similarity,
-                            best_matches ? best_matches_max_similarity : max_similarity),
-        };
-
-        for (int i = 0; i < metadata_lines.size(); i++)
-        {
-            cv::putText(frame,
-                        metadata_lines[i],
-                        cv::Point2d(static_cast<int>(face_scaled_rect.x),
-                                    static_cast<int>(face_scaled_rect.y - i * 40)),
-                        cv::FONT_HERSHEY_PLAIN,
-                        3,
-                        {255, 0, 0},
-                        2);
-            g_free(metadata_lines[i]);
-        }
 
         DetectedFace face_metadata = {
             original_size,
-            face_scaled_rect,
+            {
+                cvRound(x * sx),
+                cvRound(y * sy),
+                cvRound(width * sx),
+                cvRound(height * sy)
+            },
             min_similarity,
             max_similarity,
             (best_matches > 0) ? std::make_optional<Identity>(Identity{

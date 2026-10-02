@@ -150,22 +150,21 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
     FRDetectionMetadata *metadata = reinterpret_cast<FRDetectionMetadata *>(
         gst_buffer_add_meta(buf, FR_DETECTION_META_INFO, NULL));
 
-    GstVideoFrame frame;
-    if (gst_video_frame_map(&frame, &info, buf, GST_MAP_READWRITE))
+    GstVideoFrame frame_view;
+
+    if (gst_video_frame_map(&frame_view, &info, buf, GST_MAP_READWRITE))
     {
-        guint8 *data = static_cast<guint8 *>(GST_VIDEO_FRAME_PLANE_DATA(&frame, 0));
-        cv::Mat image(height, width, CV_8UC3, data, stride);
+        guint8 *data = static_cast<guint8 *>(GST_VIDEO_FRAME_PLANE_DATA(&frame_view, 0));        
+        
+        cv::Mat frame(height, 
+                      width, 
+                      CV_8UC3, 
+                      data,
+                      stride);
 
-        if (!element->processor)
-        {
-            gst_video_frame_unmap(&frame);
-            gst_caps_unref(caps);
-            return GST_FLOW_ERROR;
-        }
+        metadata->detected_faces = element->processor->process_frame(frame, 1024);
 
-        metadata->detected_faces = element->processor->process_frame(image, 1024);
-
-        gst_video_frame_unmap(&frame);
+        gst_video_frame_unmap(&frame_view);
     }
 
     gst_caps_unref(caps);

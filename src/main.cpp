@@ -5,6 +5,7 @@
 #include <gst/gst.h>
 
 #include "pipeline/elements/fr_element.hpp"
+#include "pipeline/elements/fr_metadata_visualizer.hpp"
 #include "pipeline/fr_pipeline.hpp"
 #include "pipeline/mp4_fr_pipeline.hpp"
 #include "pipeline/webcam_fr_pipeline.hpp"
@@ -21,7 +22,13 @@ int main(int argc, char *argv[])
     // Register custom components
     if (!gst_element_register(nullptr, "fr-element", GST_RANK_NONE, GST_TYPE_FR_ELEMENT))
     {
-        std::cerr << "Failed to register myprocess element" << std::endl;
+        std::cerr << "Failed to register fr-element" << std::endl;
+        return 1;
+    }
+
+    if (!gst_element_register(nullptr, "fr-metadata-visualizer", GST_RANK_NONE, GST_TYPE_FR_METADATA_VISUALIZER))
+    {
+        std::cerr << "Failed to register fr-metadata-visualizer element" << std::endl;
         return 1;
     }
     

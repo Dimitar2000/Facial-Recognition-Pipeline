@@ -34,6 +34,7 @@ class FRPipeline
         const char * EL_FR_SKIP_QUEUE             = "fr_skip_queue";
         const char * EL_FRAMERATE                 = "framerate";
         const char * EL_FRAMERATE_FILTER          = "capsfilter_fps";
+        const char * EL_FR_META_VISUALIZER        = "fr_meta_visualizer";
         const char * EL_VIDEO_CONVERT_TO_SINK     = "video_convert_to_sink";
         const char * EL_SINK                      = "sink";
 };

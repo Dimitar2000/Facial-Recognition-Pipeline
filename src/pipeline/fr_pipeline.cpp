@@ -18,6 +18,7 @@ FRPipeline::FRPipeline(double target_fps,
 
     GstElementLM video_convert(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_FROM_SOURCE));
     GstElementLM fr_element(gst_element_factory_make("fr-element", EL_FR_ELEMENT));
+    GstElementLM fr_meta_visualizer(gst_element_factory_make("fr-metadata-visualizer", EL_FR_META_VISUALIZER));
     GstElementLM video_convert2(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_TO_SINK));
     GstElementLM sink(gst_element_factory_make("autovideosink", EL_SINK));
 
@@ -28,11 +29,13 @@ FRPipeline::FRPipeline(double target_fps,
 
     pipeline.add_to_pipeline(std::move(video_convert));
     pipeline.add_to_pipeline(std::move(fr_element));
+    pipeline.add_to_pipeline(std::move(fr_meta_visualizer));
     pipeline.add_to_pipeline(std::move(video_convert2));
     pipeline.add_to_pipeline(std::move(sink));
 
     pipeline.link_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_FR_ELEMENT);
-    pipeline.link_elements(EL_FR_ELEMENT, EL_VIDEO_CONVERT_TO_SINK);
+    pipeline.link_elements(EL_FR_ELEMENT, EL_FR_META_VISUALIZER);
+    pipeline.link_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
     pipeline.link_elements(EL_VIDEO_CONVERT_TO_SINK, EL_SINK);
 
     if (target_fps != 0.0)
@@ -80,13 +83,13 @@ void FRPipeline::extend_for_stable_fps()
 
     std::cout << "[Configuration] Inserting new elements" << std::endl;
 
-    pipeline.unlink_elements(EL_FR_ELEMENT, EL_VIDEO_CONVERT_TO_SINK);
+    pipeline.unlink_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
 
     pipeline.add_to_pipeline(std::move(queue));
     pipeline.add_to_pipeline(std::move(videorate));
     pipeline.add_to_pipeline(std::move(capsfilter));
 
-    pipeline.link_elements(EL_FR_ELEMENT, EL_FR_SKIP_QUEUE);
+    pipeline.link_elements(EL_FR_META_VISUALIZER, EL_FR_SKIP_QUEUE);
     pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);
     pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
     pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);
