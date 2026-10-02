@@ -119,6 +119,13 @@ class GstPipelineLM: public GstElementLM {
                 throw std::runtime_error("Pipeline elements could not be linked");
             }
         }
+
+        void unlink_elements(const std::string& el1, const std::string& el2) {
+            GstElement* element1 = gst_bin_get_by_name(GST_BIN(get()), el1.c_str());
+            GstElement* element2 = gst_bin_get_by_name(GST_BIN(get()), el2.c_str());
+
+            gst_element_unlink(element1, element2);
+        }
 };
 
 class GstBusLM {

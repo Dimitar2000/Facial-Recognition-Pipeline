@@ -1,10 +1,12 @@
 #include <glib-object.h>
+#include <gst/gstclock.h>
 #include <gst/gstelement.h>
 #include <gst/gstobject.h>
 #include <gst/gstpipeline.h>
 #include <gst/gstutils.h>
 #include <string>
 
+#include "config_calculator.hpp"
 #include "fr_transformer.hpp"
 #include "gst_element_lm.hpp"
 
@@ -86,11 +88,54 @@ class FRPipeline
             pipeline.link_elements("video_convert", "facial-recognition-transformer");
             pipeline.link_elements("facial-recognition-transformer", "video_convert_2");
             pipeline.link_elements("video_convert_2", "sink");
+
+            // If a stable fps is requested, extend the pipeline with queueing
+            if (target_fps != 0.0)
+            {
+                std::cout << "[Configuration] Extending pipeline with queuing for stable FPS: " << std::endl;
+                extend_for_stable_fps();
+            }
+        }
+
+    private:
+        void extend_for_stable_fps()
+        {
+            // TODO calibrate prior to pipeline playing based on profiling FR/pipeline latency
+            // Compute the required queue size for the requested FPS
+            auto slots = config_calculator.compute_queue_slots(target_fps, 
+                                                                      1 * GST_MSECOND, 
+                                                                      1 * GST_MSECOND,
+                                                                      200 * GST_MSECOND);
+            
+            std::cout << "[Configuration] Computed FR skip queue size: " << slots << std::endl;
+
+            // Create queue
+            GstElementLM queue(gst_element_factory_make ("queue", EL_FR_SKIP_QUEUE));
+
+            // Configure queue buffers
+            g_object_set(queue.get(),
+                         "max-size-buffers", slots,
+                         "max-size-bytes", 0,
+                         "max-size-time", 0,
+                         nullptr);
+
+            auto *transformer = GST_FR_TRANSFORMER(pipeline.get_by_name("facial-recognition-transformer"));
+            gst_fr_transformer_set_skips(transformer, slots - 1);
+            
+            // Insert queue between FR transformer and next element
+            pipeline.add_to_pipeline(std::move(queue));
+            pipeline.unlink_elements("facial-recognition-transformer", "video_convert_2");
+
+            pipeline.link_elements("facial-recognition-transformer", EL_FR_SKIP_QUEUE);
+            pipeline.link_elements(EL_FR_SKIP_QUEUE, "video_convert_2");          
         }
 
     protected:
+        ConfigCalculator config_calculator;
         double target_fps;
         GstPipelineLM pipeline;
+
+        const char * EL_FR_SKIP_QUEUE = "fr_skip_queue";
 };
 
 class WebcamFRPipeline: public FRPipeline
