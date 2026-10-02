@@ -73,10 +73,10 @@ class FRPipeline
             GstElementLM video_convert2(gst_element_factory_make ("videoconvert", "video_convert_2"));
             GstElementLM sink(gst_element_factory_make ("autovideosink", "sink"));
 
-            gst_fr_transformer_set_data(GST_FR_TRANSFORMER(fr_transformer.get()),
-                                        face_dataset_file_path,
-                                        yunet_model_file_path,
-                                        sface_model_file_path);
+            gst_fr_transformer_load_models(GST_FR_TRANSFORMER(fr_transformer.get()),
+                                           face_dataset_file_path,
+                                           yunet_model_file_path,
+                                           sface_model_file_path);
 
             pipeline.add_to_pipeline(std::move(video_convert));
             pipeline.add_to_pipeline(std::move(fr_transformer));

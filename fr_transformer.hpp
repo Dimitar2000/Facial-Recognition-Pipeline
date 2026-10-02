@@ -14,10 +14,10 @@ G_DECLARE_FINAL_TYPE(
     GstElement
 )
 
-bool gst_fr_transformer_set_data(GstFRTransformer * transformer,
-                                 const std::string& face_dataset_file_path,
-                                 const std::string& yunet_model_file_path,
-                                 const std::string& sface_model_file_path);
+void gst_fr_transformer_load_models(GstFRTransformer * transformer,
+                                    const std::string& face_dataset_file_path,
+                                    const std::string& yunet_model_file_path,
+                                    const std::string& sface_model_file_path);
 
 gboolean gst_fr_transformer_sink_event (GstPad *pad, 
                                         GstObject *parent, 

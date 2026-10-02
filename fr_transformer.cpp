@@ -9,6 +9,7 @@
 #include <gst/video/video-info.h>
 #include <opencv2/core/types.hpp>
 #include <opencv2/imgproc.hpp>
+#include <stdexcept>
 #include <string>
 
 #include "fr_detection_metadata.hpp"
@@ -88,17 +89,18 @@ static void gst_fr_transformer_init (GstFRTransformer *filter)
     gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
 }
 
-bool gst_fr_transformer_set_data(GstFRTransformer * transformer,
-                                 const std::string& face_dataset_file_path,
-                                 const std::string& yunet_model_file_path,
-                                 const std::string& sface_model_file_path)
+void gst_fr_transformer_load_models(GstFRTransformer * transformer,
+                                    const std::string& face_dataset_file_path,
+                                    const std::string& yunet_model_file_path,
+                                    const std::string& sface_model_file_path)
 {
     std::vector<FaceEmbeddings> face_database = parse_yaml_embeddings(face_dataset_file_path);
 
     if (face_database.empty())
     {
         std::cerr << "No embeddings were loaded." << std::endl;
-        return 1;
+
+        throw std::runtime_error("No embeddings were loaded.");
     }
 
     transformer->face_database = face_database;
@@ -111,8 +113,6 @@ bool gst_fr_transformer_set_data(GstFRTransformer * transformer,
 																"");
 
 	std::cout << "Loaded facial recognition models." << std::endl;
-
-	return 0;
 }
 
 gboolean gst_fr_transformer_sink_event (GstPad *pad, GstObject *parent, GstEvent  *event)
