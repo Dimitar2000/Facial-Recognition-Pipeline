@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "elements/fr_element.hpp"
+#include "gst_wrappers/gst_element_lm.hpp"
 
 FRPipeline::FRPipeline(double target_fps,
                        std::string face_dataset_file_path,
