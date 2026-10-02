@@ -1,32 +1,14 @@
 #pragma once 
 
 #include <gst/gstmeta.h>
-#include <opencv2/core/types.hpp>
-#include <optional>
-#include <string>
 #include <vector>
 
-typedef struct Identity {
-    std::string name;
-    int reference_matches;
-    int reference_images;
-    double min_similarity;
-    double max_similarity;
-} Identity;
-
-typedef struct DetectedFace {
-    cv::Size frame_size;
-    cv::Rect face_rect;
-    
-    double min_similarity;
-    double max_similarity;
-    std::optional<Identity> identity;
-} DetectedFace;
+#include "fr/fr_processor.hpp"
 
 typedef struct FRDetectionMetadata {
     GstMeta meta;
 
-    std::vector<DetectedFace> detected_faces;
+    std::vector<FRProcessor::DetectedFace> detected_faces;
 } FRDetectionMetadata;
 
 GType fr_detection_meta_api_get_type(void);

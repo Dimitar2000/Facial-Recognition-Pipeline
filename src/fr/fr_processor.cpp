@@ -5,10 +5,10 @@
 #include <iostream>
 #include <optional>
 
+#include <glib.h>
 #include <opencv2/core/types.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include "pipeline/fr_detection_metadata.hpp"
 #include "util/yaml.hpp"
 
 FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
@@ -31,10 +31,10 @@ FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
     std::cout << "Loaded facial recognition models." << std::endl;
 }
 
-void FRProcessor::process_frame(cv::Mat& frame,
-                                int scaled_width,
-                                FRDetectionMetadata *metadata)
+std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame, int scaled_width)
 {
+    std::vector<DetectedFace> detected_faces;
+
     using Clock = std::chrono::steady_clock;
     const auto record_end = [](const char *label, Clock::time_point start)
     {
@@ -69,7 +69,7 @@ void FRProcessor::process_frame(cv::Mat& frame,
     if (faces.empty())
     {
         std::cout << "No faces detected\n";
-        return;
+        return detected_faces;
     }
 
     for (int i = 0; i < faces.rows; i++)
@@ -177,6 +177,8 @@ void FRProcessor::process_frame(cv::Mat& frame,
             }) : std::nullopt
         };
 
-        metadata->detected_faces.push_back(face_metadata);
+        detected_faces.push_back(face_metadata);
     }
+
+    return detected_faces;
 }

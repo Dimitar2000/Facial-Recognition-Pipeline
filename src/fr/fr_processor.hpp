@@ -2,23 +2,42 @@
 
 #include <opencv2/core/mat.hpp>
 #include <opencv2/objdetect/face.hpp>
+#include <optional>
 #include <string>
 #include <vector>
-
-#include "fr/face_embeddings.hpp"
-
-struct FRDetectionMetadata;
 
 class FRProcessor
 {
     public:
+        struct FaceEmbeddings
+        {
+            std::string name;
+            std::vector<cv::Mat> embeddings; 
+        };
+
+        struct Identity {
+            std::string name;
+            int reference_matches;
+            int reference_images;
+            double min_similarity;
+            double max_similarity;
+        };
+
+        struct DetectedFace {
+            cv::Size frame_size;
+            cv::Rect face_rect;
+            
+            double min_similarity;
+            double max_similarity;
+            std::optional<Identity> identity;
+        };
+
         FRProcessor(const std::string& face_dataset_file_path,
                     const std::string& yunet_model_file_path,
                     const std::string& sface_model_file_path);
 
-        void process_frame(cv::Mat& frame,
-                           int scaled_width,
-                           FRDetectionMetadata* metadata);
+        std::vector<DetectedFace> process_frame(cv::Mat& frame, 
+                                                int scaled_width);
 
     private:
         cv::Ptr<cv::FaceDetectorYN> face_detector;

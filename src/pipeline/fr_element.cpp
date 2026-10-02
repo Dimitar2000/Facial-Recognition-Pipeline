@@ -165,7 +165,7 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
             return GST_FLOW_ERROR;
         }
 
-        element->processor->process_frame(image, 1024, metadata);
+        metadata->detected_faces = element->processor->process_frame(image, 1024);
         gst_video_frame_unmap(&frame);
     }
 
