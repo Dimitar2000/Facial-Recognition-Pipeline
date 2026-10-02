@@ -50,8 +50,20 @@ int main(int argc, char *argv[])
     }
     catch (std::exception e)
     {
-        std::cerr << "Invalid fps value - not a number - <" << target_fps_s << ">" << std::endl;
+        std::cerr << "Invalid FPS value - not a number - <" << target_fps_s << ">" << std::endl;
         return 1;
+    }
+
+    if (target_fps < 0.0) 
+    {
+        std::cerr << "Invalid FPS value - negative value - <" << target_fps_s << ">" << std::endl;
+        return 1;
+    }
+
+    if (target_fps > 30.0)
+    {
+        std::cerr << "Invalid FPS value - unsupported - <" << target_fps_s << ">" << std::endl;
+        return 1;            
     }
 
     if (source_type == "mp4")
