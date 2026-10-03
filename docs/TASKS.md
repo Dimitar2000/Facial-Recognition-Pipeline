@@ -34,29 +34,31 @@
 
 * [ ] Handle changes in source resolution
 
+* [ ] Handle changes in computing power (CPU frequency changes) 
+
 Current Issues/Limitations
 ---
 * Pipeline
-    - does not have constant FPS at output
+    - ~~does not have constant FPS at output~~
+    - ~~long FR detection and recognition latencies result in stalling and dropping frames at the output~~
     - initial frames seem to take longer FR time - cold start?
-    - long FR detection and recognition latencies result in stalling and dropping frames at the output
 
 * FR dataset
     - only one face is in the dataset
 
-* FR quality
+* Face Detection quality
     - static detection size - different video resolutions result in different amount of image information loss
     - faces are often not detected despite suitable size and lighting conditions
 
 * Runtime Information
-    - metadata is attached and not read later
+    - ~~metadata is attached and not read later~~
     - don't know average and maximum time FR stages take
     - don't know what is the avg processing time of other pipeline elements
     - don't know what is the maximum achievable FPS for a non-queue pipeline using the previous info
     - don't know what is the maximum achievable FPS for a queue buffering pipeline using the previous info
-    - don't know when frames are dropped
-    - don't know if the current frame FR processing could
-        stall the pipeline if not dropped.
+    - ~~don't know when frames are dropped~~
+    - ~~don't know if the current frame FR processing could
+        stall the pipeline if not dropped.~~
 
 * Static Information 
-    - don't know how to use a queue element
+    - ~~don't know how to use a queue element~~
