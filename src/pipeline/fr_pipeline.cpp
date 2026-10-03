@@ -323,34 +323,77 @@ void FRPipeline::run()
     
     gst_element_set_state(pipeline.get(), GST_STATE_PLAYING);
 
+    
     GstBusLM bus(gst_element_get_bus(pipeline.get()));
-    GstMessageLM msg(gst_bus_timed_pop_filtered(
-        bus.get(),
-        GST_CLOCK_TIME_NONE,
-        static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS)));
 
-    if (msg.get() != NULL)
+    bool run = true;
+
+    while (run)
     {
-        GError *err;
-        gchar *debug_info;
+        GstMessageLM msg(gst_bus_timed_pop_filtered(
+            bus.get(),
+            GST_CLOCK_TIME_NONE,
+            static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS)));
 
         switch (GST_MESSAGE_TYPE(msg.get()))
         {
+        case GST_MESSAGE_APPLICATION:
+        {
+            std::cout << "[Pipeline] Received application message";
+
+            const GstStructure *s = gst_message_get_structure(msg.get());
+
+            if (gst_structure_has_name(s, "reconfigure-fps")) 
+            {
+                std::cout << "[Pipeline] Reconfiguring for new fps";
+    
+                double new_fps;
+
+                // Extract the new fps
+                gst_structure_get_double(s, "fps", &new_fps);
+
+                // If the new fps is lower than the current Reconfigure the queuing
+                target_fps = new_fps;
+
+                configure_skip_queues(target_fps, fr_measurement.max
+                                                        ? fr_measurement.max
+                                                        : DEFAULT_FR_MAX_LATENCY);
+            }
+            break;
+        }
+
+        case GST_MESSAGE_EOS:
+        {
+            g_print("End-Of-Stream reached.\n");
+
+            run = false;
+
+            break;
+        }
+
         case GST_MESSAGE_ERROR:
+        {
+            GError *err;
+            gchar *debug_info;
+        
             gst_message_parse_error(msg.get(), &err, &debug_info);
             g_printerr("Error received from element %s: %s\n",
-                       GST_OBJECT_NAME(msg.get()->src), err->message);
+                    GST_OBJECT_NAME(msg.get()->src), err->message);
             g_printerr("Debugging information: %s\n",
-                       debug_info ? debug_info : "none");
+                    debug_info ? debug_info : "none");
             g_clear_error(&err);
             g_free(debug_info);
+
+            run = false;
+
             break;
-        case GST_MESSAGE_EOS:
-            g_print("End-Of-Stream reached.\n");
-            break;
+        }
+
         default:
+        {
             g_printerr("Unexpected message received.\n");
             break;
+        }
         }
     }
 
