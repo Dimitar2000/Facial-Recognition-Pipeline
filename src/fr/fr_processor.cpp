@@ -1,5 +1,6 @@
 #include "fr_processor.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <iostream>
 #include <optional>
@@ -42,17 +43,22 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
 
     cv::Size original_size = {frame.cols, frame.rows};
     cv::Size scaled_size = {scaled_dim, static_cast<int>(scaled_dim / original_size.aspectRatio())};
+
     cv::Mat scaled_frame;
+    double dim_scale_factor;
+
     cv::Mat faces;
 
     if (!scaled_size.empty() && scaled_size.area() < original_size.area())
     {
         cv::resize(frame, scaled_frame, scaled_size);
+        dim_scale_factor = original_size.width * 1.0f / scaled_size.width;
     }
     else
     {
         scaled_size = original_size;
         scaled_frame = frame;
+        dim_scale_factor = 1;
     }
 
     face_detector->setInputSize(scaled_frame.size());
@@ -69,11 +75,12 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
 
     for (int i = 0; i < faces.rows; i++)
     {
-        cv::Mat face = faces.row(i);
+        cv::Mat scaled_face = faces.row(i);
+        cv::Mat face = scaled_face * dim_scale_factor;
         cv::Mat aligned_face;
         cv::Mat embedding;
 
-        face_recogniser->alignCrop(scaled_frame, face, aligned_face);
+        face_recogniser->alignCrop(frame, face, aligned_face);
 
         time_recorder.start("Embedding");
         face_recogniser->feature(aligned_face, embedding);
@@ -127,15 +134,12 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
         float width = face.at<float>(0, 2);
         float height = face.at<float>(0, 3);
 
-        double sx = static_cast<double>(original_size.width) / scaled_size.width;
-        double sy = static_cast<double>(original_size.height) / scaled_size.height;
-
         DetectedFace face_metadata = {
             {
-                cvRound(x * sx),
-                cvRound(y * sy),
-                cvRound(width * sx),
-                cvRound(height * sy)
+                cvRound(x),
+                cvRound(y),
+                cvRound(width),
+                cvRound(height)
             },
             min_similarity,
             max_similarity,
