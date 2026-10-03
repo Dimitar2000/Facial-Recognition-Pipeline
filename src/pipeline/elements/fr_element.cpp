@@ -8,7 +8,7 @@
 #include <gst/video/video-info.h>
 
 #include "fr/fr_processor.hpp"
-#include "pipeline/metadata/fr_detection_metadata.hpp"
+#include "pipeline/metadata/fr_metadata.hpp"
 #include "util/record.hpp"
 
 typedef struct _FRElement {
@@ -147,8 +147,13 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
         return GST_FLOW_ERROR;
     }
 
-    FRDetectionMetadata *metadata = reinterpret_cast<FRDetectionMetadata *>(
-        gst_buffer_add_meta(buf, FR_DETECTION_META_INFO, NULL));
+    FRMetadata *metadata = reinterpret_cast<FRMetadata *>(
+        gst_buffer_add_meta(buf, FR_METADATA_INFO, NULL));
+
+    if (!metadata)
+    {
+        throw "MMM";
+    }
 
     GstVideoFrame frame_view;
 
@@ -163,6 +168,8 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
                       stride);
 
         metadata->detected_faces = element->processor->process_frame(frame, 1024);
+        metadata->frame_width = frame.cols;
+        metadata->frame_heigth = frame.rows;
 
         gst_video_frame_unmap(&frame_view);
     }

@@ -127,9 +127,7 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
         double sx = static_cast<double>(original_size.width) / scaled_size.width;
         double sy = static_cast<double>(original_size.height) / scaled_size.height;
 
-
         DetectedFace face_metadata = {
-            original_size,
             {
                 cvRound(x * sx),
                 cvRound(y * sy),

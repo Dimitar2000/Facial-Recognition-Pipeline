@@ -6,7 +6,7 @@
 
 #include <opencv2/imgproc.hpp>
 
-#include "pipeline/metadata/fr_detection_metadata.hpp"
+#include "pipeline/metadata/fr_metadata.hpp"
 
 typedef struct _FRMetadataVisualizer {
     GstElement element;
@@ -58,7 +58,7 @@ static void gst_fr_metadata_visualizer_init(FRMetadataVisualizer *element)
     gst_element_add_pad(GST_ELEMENT(element), element->srcpad);
 }
 
-static void gst_fr_metadata_visualizer_handle_metadata(cv::Mat& frame, FRDetectionMetadata *metadata)
+static void gst_fr_metadata_visualizer_handle_metadata(cv::Mat& frame, FRMetadata *metadata)
 {
     if (!metadata)
     {
@@ -156,8 +156,8 @@ GstFlowReturn gst_fr_metadata_visualizer_chain(GstPad *pad,
     guint height = GST_VIDEO_INFO_HEIGHT(&info);
     guint stride = GST_VIDEO_INFO_PLANE_STRIDE(&info, 0);
 
-    FRDetectionMetadata *metadata = reinterpret_cast<FRDetectionMetadata *>(
-        gst_buffer_get_meta(buf, FR_DETECTION_META_API_TYPE)
+    FRMetadata *metadata = reinterpret_cast<FRMetadata *>(
+        gst_buffer_get_meta(buf, FR_METADATA_API_TYPE)
     );
 
     GstVideoFrame frame_view;

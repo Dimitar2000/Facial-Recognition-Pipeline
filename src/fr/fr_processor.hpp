@@ -24,7 +24,6 @@ class FRProcessor
         };
 
         struct DetectedFace {
-            cv::Size frame_size;
             cv::Rect face_rect;
             
             double min_similarity;
