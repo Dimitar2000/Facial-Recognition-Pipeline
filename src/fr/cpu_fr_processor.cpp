@@ -2,43 +2,27 @@
 
 #include <cmath>
 #include <cstdio>
-#include <iostream>
 #include <optional>
 
 #include <glib.h>
 #include <opencv2/core/types.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "fr/fr_processor.hpp"
 #include "util/record.hpp"
-#include "util/yaml.hpp"
 
 CPUFRProcessor::CPUFRProcessor(const std::string& face_dataset_file_path,
                                const std::string& yunet_model_file_path,
                                const std::string& sface_model_file_path,
                                int scaled_dim)
 :   
-    scaled_dim(scaled_dim)
-{
-    face_database = parse_yaml_embeddings(face_dataset_file_path);
-    
-    if (face_database.empty())
-    {
-        std::cerr << "No embeddings were loaded." << std::endl;
-        throw std::runtime_error("No embeddings were loaded.");
-    }
+    FRProcessor(face_dataset_file_path, 
+                yunet_model_file_path, 
+                sface_model_file_path, 
+                scaled_dim) 
+{}
 
-    std::cout << "[FR Processor] Loaded embeddings." << std::endl;
-
-    face_detector = cv::FaceDetectorYN::create(yunet_model_file_path,
-                                               "",
-                                               cv::Size(0, 0));
-    face_recogniser = cv::FaceRecognizerSF::create(sface_model_file_path, 
-                                                   "");
-
-    std::cout << "[FR Processor] Loaded facial recognition models." << std::endl;
-}
-
-std::vector<CPUFRProcessor::DetectedFace> CPUFRProcessor::process_frame(cv::Mat& frame)
+std::vector<FRProcessor::DetectedFace> CPUFRProcessor::process_frame(cv::Mat& frame)
 {
     std::vector<DetectedFace> detected_faces;
     TimeRecorder time_recorder;

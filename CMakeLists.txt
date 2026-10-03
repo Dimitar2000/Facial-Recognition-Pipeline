@@ -27,6 +27,7 @@ add_executable(facial-recog-pipeline
 			   src/pipeline/elements/fr_metadata_visualizer.cpp
 			   src/pipeline/metadata/fr_metadata.cpp
 			   src/pipeline/webcam_fr_pipeline.cpp
+			   src/fr/fr_processor.cpp
 			   src/fr/cpu_fr_processor.cpp
 			   src/util/yaml.cpp
 			   src/pipeline/webcam_fr_pipeline.hpp

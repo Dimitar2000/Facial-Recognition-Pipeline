@@ -14,7 +14,7 @@
 typedef struct _FRElement {
     GstElement element;
     GstPad *sinkpad, *srcpad;
-    CPUFRProcessor *processor;
+    FRProcessor *processor;
     guint skips;
     guint remaining_skips;
 } FRElement;
@@ -83,11 +83,10 @@ void gst_fr_element_init_processor(FRElement *element,
                                    const std::string& sface_model_file_path,
                                    int scaled_dim)
 {
-    delete element->processor;
     element->processor = new CPUFRProcessor(face_dataset_file_path,
-                                         yunet_model_file_path,
-                                         sface_model_file_path,
-                                         scaled_dim);
+                                            yunet_model_file_path,
+                                            sface_model_file_path,
+                                            scaled_dim);
 }
 
 void gst_fr_element_set_skips(FRElement *element, guint skips)
