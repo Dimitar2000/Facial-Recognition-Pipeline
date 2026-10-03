@@ -1,9 +1,11 @@
 #include "fr_pipeline.hpp"
 
+#include <algorithm>
 #include <glib-object.h>
 #include <gst/gst.h>
 #include <gst/gstelement.h>
 #include <gst/gstpad.h>
+#include <gst/gstutils.h>
 #include <iostream>
 #include <stdexcept>
 #include <utility>
@@ -16,6 +18,7 @@ FRPipeline::FRPipeline(double target_fps,
                        std::string yunet_model_file_path,
                        std::string sface_model_file_path)
     : target_fps(target_fps),
+      fr_measurement{0, 0, 0},
       warm_up_frame_counter(0)
 {
     pipeline = GstPipelineLM(gst_pipeline_new(EL_PIPELINE));
@@ -43,11 +46,34 @@ FRPipeline::FRPipeline(double target_fps,
     pipeline.link_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
     pipeline.link_elements(EL_VIDEO_CONVERT_TO_SINK, EL_SINK);
 
+    attach_fr_measurement_probes();
+
     if (target_fps != 0.0)
     {
         std::cout << "[Configuration] Extending pipeline with queuing for stable FPS: " << std::endl;
         extend_for_stable_fps();
     }
+}
+
+void FRPipeline::attach_fr_measurement_probes()
+{
+    FRElement * fr_element = GST_FR_ELEMENT(pipeline.get_by_name(EL_FR_ELEMENT));
+
+    // Install a dropping probe to stop the pipeline after N frames
+    GstPadLM sink_pad(gst_element_get_static_pad(GST_ELEMENT(fr_element), "sink"));
+    GstPadLM src_pad(gst_element_get_static_pad(GST_ELEMENT(fr_element), "src"));
+
+    gst_pad_add_probe(sink_pad.get(),
+                      GST_PAD_PROBE_TYPE_BUFFER,
+                      FRPipeline::fr_measure_probe_entry_cb,
+                      &this->fr_measurement,
+                      NULL);
+   
+    gst_pad_add_probe(src_pad.get(),
+                      GST_PAD_PROBE_TYPE_BUFFER,
+                      FRPipeline::fr_measure_probe_exit_cb,
+                      &this->fr_measurement,
+                      NULL);
 }
 
 void FRPipeline::extend_for_stable_fps()
@@ -100,9 +126,32 @@ void FRPipeline::extend_for_stable_fps()
     pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);
 }
 
-GstPadProbeReturn FRPipeline::warm_up_drop_probe_cb(GstPad *pad,
-                                                    GstPadProbeInfo *info,
-                                                    gpointer user_data)
+GstPadProbeReturn FRPipeline::fr_measure_probe_entry_cb(GstPad *pad,
+                                                        GstPadProbeInfo *info,
+                                                        gpointer user_data)
+{
+    TimeMeasurement *fr_measurement = reinterpret_cast<TimeMeasurement *>(user_data);
+
+    fr_measurement->base = gst_util_get_timestamp();
+
+    return GST_PAD_PROBE_OK;
+}
+
+GstPadProbeReturn FRPipeline::fr_measure_probe_exit_cb(GstPad *pad,
+                                                       GstPadProbeInfo *info,
+                                                       gpointer user_data)
+{
+    TimeMeasurement *fr_measurement = reinterpret_cast<TimeMeasurement *>(user_data);
+
+    fr_measurement->last = gst_util_get_timestamp() - fr_measurement->base;
+    fr_measurement->max  = std::max(fr_measurement->last, fr_measurement->max);
+
+    return GST_PAD_PROBE_OK;
+}
+
+GstPadProbeReturn FRPipeline::fr_warm_up_drop_probe_cb(GstPad *pad,
+                                                       GstPadProbeInfo *info,
+                                                       gpointer user_data)
 {
     std::cout << "[Block Probe] Stopping warm up frame" << std::endl;
 
@@ -141,7 +190,7 @@ void FRPipeline::warm_up()
 
     int drop_probe_id = gst_pad_add_probe(src_pad.get(),
                                           GST_PAD_PROBE_TYPE_BUFFER,
-                                          FRPipeline::warm_up_drop_probe_cb,
+                                          FRPipeline::fr_warm_up_drop_probe_cb,
                                           &this->warm_up_frame_counter,
                                           NULL);
 

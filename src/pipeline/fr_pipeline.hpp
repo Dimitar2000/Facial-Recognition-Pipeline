@@ -1,5 +1,6 @@
 #pragma once
 
+#include <gst/gstclock.h>
 #include <string>
 
 #include "config_calculator.hpp"
@@ -30,21 +31,37 @@ class FRPipeline
                    std::string sface_model_file_path);
 
     private:
+        void attach_fr_measurement_probes();
         void extend_for_stable_fps();
 
-        static GstPadProbeReturn warm_up_drop_probe_cb(GstPad *pad,
-                                                       GstPadProbeInfo *info,
-                                                       gpointer user_data);
+        static GstPadProbeReturn fr_measure_probe_entry_cb(GstPad *pad,
+                                                           GstPadProbeInfo *info,
+                                                           gpointer user_data);
+
+        static GstPadProbeReturn fr_measure_probe_exit_cb(GstPad *pad,
+                                                          GstPadProbeInfo *info,
+                                                          gpointer user_data);
+
+        static GstPadProbeReturn fr_warm_up_drop_probe_cb(GstPad *pad,
+                                                          GstPadProbeInfo *info,
+                                                          gpointer user_data);
 
     public:
         static const guint WARMUP_FRAMES = 10;
 
     protected:
+        struct TimeMeasurement {
+            GstClockTime base;
+            GstClockTime last;
+            GstClockTime max;
+        };
+
         ConfigCalculator config_calculator;
         double target_fps;
         GstPipelineLM pipeline;
 
-        guint warm_up_frame_counter;
+        TimeMeasurement fr_measurement;
+        guint    warm_up_frame_counter;        
 
         const char * EL_PIPELINE                  = "pipeline";
         const char * EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";
