@@ -80,12 +80,14 @@ static void gst_fr_element_init(FRElement *element)
 void gst_fr_element_init_processor(FRElement *element,
                                    const std::string& face_dataset_file_path,
                                    const std::string& yunet_model_file_path,
-                                   const std::string& sface_model_file_path)
+                                   const std::string& sface_model_file_path,
+                                   int scaled_dim)
 {
     delete element->processor;
     element->processor = new FRProcessor(face_dataset_file_path,
                                          yunet_model_file_path,
-                                         sface_model_file_path);
+                                         sface_model_file_path,
+                                         scaled_dim);
 }
 
 void gst_fr_element_set_skips(FRElement *element, guint skips)
@@ -167,7 +169,7 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
                       data,
                       stride);
 
-        metadata->detected_faces = element->processor->process_frame(frame, 1024);
+        metadata->detected_faces = element->processor->process_frame(frame);
         metadata->frame_width = frame.cols;
         metadata->frame_heigth = frame.rows;
 

@@ -13,7 +13,10 @@
 
 FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
                          const std::string& yunet_model_file_path,
-                         const std::string& sface_model_file_path)
+                         const std::string& sface_model_file_path,
+                         int scaled_dim)
+:   
+    scaled_dim(scaled_dim)
 {
     face_database = parse_yaml_embeddings(face_dataset_file_path);
     
@@ -32,13 +35,13 @@ FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
     std::cout << "Loaded facial recognition models." << std::endl;
 }
 
-std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame, int scaled_width)
+std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame)
 {
     std::vector<DetectedFace> detected_faces;
     TimeRecorder time_recorder;
 
     cv::Size original_size = {frame.cols, frame.rows};
-    cv::Size scaled_size = {scaled_width, static_cast<int>(scaled_width / original_size.aspectRatio())};
+    cv::Size scaled_size = {scaled_dim, static_cast<int>(scaled_dim / original_size.aspectRatio())};
     cv::Mat scaled_frame;
     cv::Mat faces;
 

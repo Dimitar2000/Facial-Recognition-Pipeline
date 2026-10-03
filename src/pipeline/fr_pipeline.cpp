@@ -25,7 +25,8 @@ FRPipeline::FRPipeline(double target_fps,
     gst_fr_element_init_processor(GST_FR_ELEMENT(fr_element.get()),
                                   face_dataset_file_path,
                                   yunet_model_file_path,
-                                  sface_model_file_path);
+                                  sface_model_file_path,
+                                  1024);
 
     pipeline.add_to_pipeline(std::move(video_convert));
     pipeline.add_to_pipeline(std::move(fr_element));

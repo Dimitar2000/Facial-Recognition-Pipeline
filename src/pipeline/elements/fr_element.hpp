@@ -17,7 +17,8 @@ G_DECLARE_FINAL_TYPE(
 void gst_fr_element_init_processor(FRElement *element,
                                    const std::string& face_dataset_file_path,
                                    const std::string& yunet_model_file_path,
-                                   const std::string& sface_model_file_path);
+                                   const std::string& sface_model_file_path,
+                                   int scaled_dim);
 
 void gst_fr_element_set_skips(FRElement *element,
                               guint skips);

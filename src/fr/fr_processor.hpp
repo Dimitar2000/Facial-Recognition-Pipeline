@@ -51,13 +51,15 @@ class FRProcessor
 
         FRProcessor(const std::string& face_dataset_file_path,
                     const std::string& yunet_model_file_path,
-                    const std::string& sface_model_file_path);
+                    const std::string& sface_model_file_path,
+                    int scaled_dim);
 
-        std::vector<DetectedFace> process_frame(cv::Mat& frame, 
-                                                int scaled_width);
+        std::vector<DetectedFace> process_frame(cv::Mat& frame);
 
     private:
         cv::Ptr<cv::FaceDetectorYN> face_detector;
         cv::Ptr<cv::FaceRecognizerSF> face_recogniser;
         std::vector<FaceEmbeddings> face_database;
+
+        int scaled_dim;
 };
