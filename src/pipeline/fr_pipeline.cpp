@@ -71,6 +71,60 @@ void FRPipeline::attach_fr_measurement_probes()
                       NULL);
 }
 
+void FRPipeline::configure_skip_queues(double target_fps, 
+                                       GstClockTime max_fr_latency)
+{
+    auto latency_pipeline_base  = 10 * GST_MSECOND;
+    auto latency_queue_overhead = 1 * GST_MSECOND;
+    auto latency_fr_max = max_fr_latency
+                                            ? max_fr_latency * FR_LATENCY_MARGIN_FACTOR
+                                            : FR_LATENCY_MARGIN_FACTOR;
+
+    std::cout << "[Pipeline] Calculating required skip queue size.\n" 
+              << "           Using: \n"
+              << "              Target FPS                 : " << target_fps << "\n"
+              << "              Latency of Base Pipeline   : " << latency_pipeline_base << "\n"
+              << "              Latency of Queue           : " << latency_queue_overhead << "\n"
+              << "              Expected Max Latency of FR : " << latency_fr_max << "\n"
+              << std::endl;
+
+    auto slots = config_calculator.compute_queue_slots(target_fps,
+                                                       latency_pipeline_base,
+                                                       latency_queue_overhead,
+                                                       latency_fr_max);
+
+    std::cout << "[Pipeline] Configuring skip queue with " << slots << " slots" << std::endl;
+
+    GstElement *queue            = pipeline.get_by_name(EL_FR_SKIP_QUEUE);
+    GstElement *framerate_filter = pipeline.get_by_name(EL_FRAMERATE_FILTER);
+    GstElement *element          = pipeline.get_by_name(EL_FR_ELEMENT);
+
+    // Set queue size
+    g_object_set(queue,
+                 "max-size-buffers", slots,
+                 "max-size-bytes", 0,
+                 "max-size-time", 0,
+                 nullptr);
+
+    // Set FR skips
+    std::cout << "[Pipeline] Configuring FR element to skip " << slots - 1 << " frames" << std::endl;
+
+    gst_fr_element_set_skips(GST_FR_ELEMENT(element), slots - 1);
+
+    std::cout << "[Pipeline] Configuring framerate pair with FPS = " << target_fps << std::endl;
+
+    // Set required FPS for queue buffers downstream
+    GstCapsLM caps(gst_caps_new_simple("video/x-raw",
+                                       "framerate",
+                                       GST_TYPE_FRACTION,
+                                       static_cast<guint>(target_fps * 100),
+                                       100,
+                                       nullptr));
+
+    g_object_set(framerate_filter, "caps", caps.get(), nullptr);
+
+}
+
 GstPadProbeReturn FRPipeline::fr_measure_probe_entry_cb(GstPad *pad,
                                                         GstPadProbeInfo *info,
                                                         gpointer user_data)
@@ -178,53 +232,11 @@ void FRPipeline::warm_up()
 
 void FRPipeline::add_skip_queuing()
 {
-    auto latency_pipeline_base  = 10 * GST_MSECOND;
-    auto latency_queue_overhead = 1 * GST_MSECOND;
-    auto latency_fr_max = fr_measurement.max * FR_LATENCY_MARGIN_FACTOR;
-
-    std::cout << "[Pipeline] Calculating required skip queue size.\n" 
-              << "           Using: \n"
-              << "              Target FPS                 : " << target_fps << "\n"
-              << "              Latency of Base Pipeline   : " << latency_pipeline_base << "\n"
-              << "              Latency of Queue           : " << latency_queue_overhead << "\n"
-              << "              Expected Max Latency of FR : " << latency_fr_max << "\n"
-              << std::endl;
-
-    auto slots = config_calculator.compute_queue_slots(target_fps,
-                                                       latency_pipeline_base,
-                                                       latency_queue_overhead,
-                                                       latency_fr_max);
-
-    std::cout << "[Pipeline] Configuring skip queue with " << slots << " slots" << std::endl;
-
     GstElementLM queue(gst_element_factory_make("queue", EL_FR_SKIP_QUEUE));
-
-    g_object_set(queue.get(),
-                 "max-size-buffers", slots,
-                 "max-size-bytes", 0,
-                 "max-size-time", 0,
-                 nullptr);
-
-    std::cout << "[Pipeline] Configuring FR element to skip " << slots - 1 << " frames" << std::endl;
-
-    auto *element = GST_FR_ELEMENT(pipeline.get_by_name(EL_FR_ELEMENT));
-    gst_fr_element_set_skips(element, slots - 1);
-
-    std::cout << "[Pipeline] Configuring framerate pair with FPS = " << target_fps << std::endl;
-
     GstElementLM videorate(gst_element_factory_make("videorate", EL_FRAMERATE));
     GstElementLM capsfilter(gst_element_factory_make("capsfilter", EL_FRAMERATE_FILTER));
 
-    GstCapsLM caps(gst_caps_new_simple("video/x-raw",
-                                       "framerate",
-                                       GST_TYPE_FRACTION,
-                                       static_cast<guint>(target_fps * 100),
-                                       100,
-                                       nullptr));
-
-    g_object_set(capsfilter.get(), "caps", caps.get(), nullptr);
-
-    std::cout << "[Pipeline] Inserting new elements" << std::endl;
+    std::cout << "[Pipeline] Inserting queueing + framerate elements" << std::endl;
 
     pipeline.unlink_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
 
@@ -236,8 +248,9 @@ void FRPipeline::add_skip_queuing()
     pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);
     pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
     pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);
-}
 
+    configure_skip_queues(target_fps, fr_measurement.max ? fr_measurement.max : DEFAULT_FR_MAX_LATENCY);
+}
 
 void FRPipeline::run()
 {

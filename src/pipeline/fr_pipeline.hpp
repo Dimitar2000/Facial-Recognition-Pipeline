@@ -20,6 +20,7 @@ class FRPipeline
         //          minimum amount of frames are skipped
         void warm_up();
 
+        // Extend the pipeline with a post-FR queue and  
         void add_skip_queuing();
 
         virtual ~FRPipeline() = default;
@@ -32,8 +33,10 @@ class FRPipeline
                    std::string yunet_model_file_path,
                    std::string sface_model_file_path);
 
-    private:
         void attach_fr_measurement_probes();
+
+        void configure_skip_queues(double target_fps, 
+                                   GstClockTime max_fr_latency);
 
         static GstPadProbeReturn fr_measure_probe_entry_cb(GstPad *pad,
                                                            GstPadProbeInfo *info,
@@ -47,7 +50,6 @@ class FRPipeline
                                                           GstPadProbeInfo *info,
                                                           gpointer user_data);
 
-    protected:
         struct TimeMeasurement {
             GstClockTime base;
             GstClockTime last;
@@ -60,9 +62,11 @@ class FRPipeline
 
         // Used to track latency of FR and reconfigure queuing
         //  after warmup and at runtime if the RTS changes
+        static const GstClockTime DEFAULT_FR_MAX_LATENCY = 100 * GST_MSECOND;
         static const guint FR_LATENCY_MARGIN_FACTOR = 2;
         TimeMeasurement fr_measurement;
 
+        // Used by the warm up procedure
         static const guint WARMUP_FRAMES = 10;
         guint    warm_up_frame_counter;        
 
