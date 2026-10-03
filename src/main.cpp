@@ -121,6 +121,7 @@ int main(int argc, char *argv[])
     // Run the pipeline
     try 
     {
+        pipeline->warm_up();
         pipeline->run();
     }
     catch(std::exception e)

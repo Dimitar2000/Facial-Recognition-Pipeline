@@ -8,7 +8,16 @@
 class FRPipeline
 {
     public:
+        // Run the pipeline 
         void run();
+
+        // Perform warm up with a few frames from the real source.
+        // This allows:
+        //      - the FR models to load all runtime data - cold start is removed
+        //      - the FR stage's latency to be measured for the actual workload
+        //      - the optimal skip+queue configuration to be created so that 
+        //          minimum amount of frames are skipped
+        void warm_up();
 
         virtual ~FRPipeline() = default;
 
@@ -23,10 +32,19 @@ class FRPipeline
     private:
         void extend_for_stable_fps();
 
+        static GstPadProbeReturn warm_up_drop_probe_cb(GstPad *pad,
+                                                       GstPadProbeInfo *info,
+                                                       gpointer user_data);
+
+    public:
+        static const guint WARMUP_FRAMES = 10;
+
     protected:
         ConfigCalculator config_calculator;
         double target_fps;
         GstPipelineLM pipeline;
+
+        guint warm_up_frame_counter;
 
         const char * EL_PIPELINE                  = "pipeline";
         const char * EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";

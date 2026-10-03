@@ -2,7 +2,10 @@
 
 #include <glib-object.h>
 #include <gst/gst.h>
+#include <gst/gstelement.h>
+#include <gst/gstpad.h>
 #include <iostream>
+#include <stdexcept>
 #include <utility>
 
 #include "elements/fr_element.hpp"
@@ -12,7 +15,8 @@ FRPipeline::FRPipeline(double target_fps,
                        std::string face_dataset_file_path,
                        std::string yunet_model_file_path,
                        std::string sface_model_file_path)
-    : target_fps(target_fps)
+    : target_fps(target_fps),
+      warm_up_frame_counter(0)
 {
     pipeline = GstPipelineLM(gst_pipeline_new(EL_PIPELINE));
 
@@ -94,6 +98,88 @@ void FRPipeline::extend_for_stable_fps()
     pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);
     pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
     pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);
+}
+
+GstPadProbeReturn FRPipeline::warm_up_drop_probe_cb(GstPad *pad,
+                                                    GstPadProbeInfo *info,
+                                                    gpointer user_data)
+{
+    std::cout << "[Block Probe] Stopping warm up frame" << std::endl;
+
+    if (!(info->type & GST_PAD_PROBE_TYPE_BUFFER))
+    {
+        return GST_PAD_PROBE_OK;
+    }
+    
+    guint *counter = reinterpret_cast<guint *>(user_data);
+
+    (*counter)++;
+
+    if (*counter >= FRPipeline::WARMUP_FRAMES) {
+
+        std::cout << "[Block Probe] Sending EOS" << std::endl;
+
+        GstElementLM pipeline(GST_ELEMENT(
+            gst_pad_get_parent_element(pad)
+        ));
+
+        gst_element_send_event(
+            pipeline.get(),
+            gst_event_new_eos()
+        );
+    }
+
+    return GST_PAD_PROBE_DROP;
+}
+
+void FRPipeline::warm_up()
+{
+    FRElement * fr_element = GST_FR_ELEMENT(pipeline.get_by_name(EL_FR_ELEMENT));
+
+    // Install a dropping probe to stop the pipeline after N frames
+    GstPadLM src_pad(gst_element_get_static_pad(GST_ELEMENT(fr_element), "src"));
+
+    int drop_probe_id = gst_pad_add_probe(src_pad.get(),
+                                          GST_PAD_PROBE_TYPE_BUFFER,
+                                          FRPipeline::warm_up_drop_probe_cb,
+                                          &this->warm_up_frame_counter,
+                                          NULL);
+
+    gst_fr_element_set_skips(fr_element, 0);
+
+    // Run the pipeline until the drop probe sends EOS
+    std::cout << "[Pipeline] Starting warm up." << std::endl;
+
+    gst_element_set_state(pipeline.get(), GST_STATE_PLAYING);
+
+    GstBusLM bus(gst_element_get_bus(pipeline.get()));
+    GstMessageLM msg(gst_bus_timed_pop_filtered(
+        bus.get(),
+        GST_CLOCK_TIME_NONE,
+        static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS)));
+
+    if (msg.get() != NULL)
+    {
+        switch (GST_MESSAGE_TYPE(msg.get()))
+        {
+        case GST_MESSAGE_ERROR:
+            throw std::runtime_error("Warm up received an error!");
+            break;
+
+        case GST_MESSAGE_EOS:
+            std::cout << "[Pipeline] Warm up finished." << std::endl;
+            break;
+        
+        default:
+            g_printerr("Unexpected message received.\n");
+            break;
+        }
+    }
+
+    gst_element_set_state(pipeline.get(), GST_STATE_NULL);
+
+    // Remove the dropping probe
+    gst_pad_remove_probe(src_pad.get(),drop_probe_id);
 }
 
 void FRPipeline::run()
