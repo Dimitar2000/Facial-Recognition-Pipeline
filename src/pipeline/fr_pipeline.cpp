@@ -8,6 +8,7 @@
 #include <gst/gstclock.h>
 #include <gst/gstelement.h>
 #include <gst/gstevent.h>
+#include <gst/gstmessage.h>
 #include <gst/gstpad.h>
 #include <gst/gststructure.h>
 #include <gst/gstutils.h>
@@ -17,6 +18,16 @@
 #include "elements/fr_element.hpp"
 #include "gst_wrappers/gst_element_lm.hpp"
 
+const char * FRPipeline::EL_PIPELINE                  = "pipeline";
+const char * FRPipeline::EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";
+const char * FRPipeline::EL_FR_ELEMENT                = "facial_recognition_element";
+const char * FRPipeline::EL_FR_SKIP_QUEUE             = "fr_skip_queue";
+const char * FRPipeline::EL_FRAMERATE                 = "framerate";
+const char * FRPipeline::EL_FRAMERATE_FILTER          = "capsfilter_fps";
+const char * FRPipeline::EL_FR_META_VISUALIZER        = "fr_meta_visualizer";
+const char * FRPipeline::EL_VIDEO_CONVERT_TO_SINK     = "video_convert_to_sink";
+const char * FRPipeline::EL_SINK                      = "sink";
+
 const char * FRPipeline::MSG_RECONFIGURE_FPS = "reconfigure-fps";
 
 FRPipeline::FRPipeline(double target_fps,
@@ -24,8 +35,7 @@ FRPipeline::FRPipeline(double target_fps,
                        std::string yunet_model_file_path,
                        std::string sface_model_file_path)
     : target_fps(target_fps),
-      fr_measurement{0, 0, 0},
-      warm_up_frame_counter(0)
+      probe_data({{0, 0, 0}, 0})
 {
     pipeline = GstPipelineLM(gst_pipeline_new(EL_PIPELINE));
 
@@ -66,13 +76,13 @@ void FRPipeline::attach_fr_measurement_probes()
     gst_pad_add_probe(sink_pad.get(),
                       GST_PAD_PROBE_TYPE_BUFFER,
                       FRPipeline::fr_measure_probe_entry_cb,
-                      &this->fr_measurement,
+                      &this->probe_data,
                       NULL);
    
     gst_pad_add_probe(src_pad.get(),
                       GST_PAD_PROBE_TYPE_BUFFER,
                       FRPipeline::fr_measure_probe_exit_cb,
-                      &this->fr_measurement,
+                      &this->probe_data,
                       NULL);
 }
 
@@ -94,9 +104,7 @@ void FRPipeline::configure_skip_queues(double target_fps,
 {
     auto latency_pipeline_base  = 10 * GST_MSECOND;
     auto latency_queue_overhead = 1 * GST_MSECOND;
-    auto latency_fr_max = max_fr_latency
-                                            ? max_fr_latency * FR_LATENCY_MARGIN_FACTOR
-                                            : FR_LATENCY_MARGIN_FACTOR;
+    auto latency_fr_max = max_fr_latency * FR_LATENCY_MARGIN_FACTOR;
 
     std::cout << "[Pipeline] Calculating required skip queue size.\n" 
               << "           Using: \n"
@@ -147,9 +155,9 @@ GstPadProbeReturn FRPipeline::fr_measure_probe_entry_cb(GstPad *pad,
                                                         GstPadProbeInfo *info,
                                                         gpointer user_data)
 {
-    TimeMeasurement *fr_measurement = reinterpret_cast<TimeMeasurement *>(user_data);
+    ProbeData *probe_data = reinterpret_cast<ProbeData *>(user_data);
 
-    fr_measurement->base = gst_util_get_timestamp();
+    probe_data->fr_measurement.base = gst_util_get_timestamp();
 
     return GST_PAD_PROBE_OK;
 }
@@ -158,10 +166,11 @@ GstPadProbeReturn FRPipeline::fr_measure_probe_exit_cb(GstPad *pad,
                                                        GstPadProbeInfo *info,
                                                        gpointer user_data)
 {
-    TimeMeasurement *fr_measurement = reinterpret_cast<TimeMeasurement *>(user_data);
+    ProbeData *probe_data = reinterpret_cast<ProbeData *>(user_data);
+    TimeMeasurement& fr_measurement = probe_data->fr_measurement;
 
-    fr_measurement->last = gst_util_get_timestamp() - fr_measurement->base;
-    fr_measurement->max  = std::max(fr_measurement->last, fr_measurement->max);
+    fr_measurement.last = gst_util_get_timestamp() - fr_measurement.base;
+    fr_measurement.max  = std::max(fr_measurement.last, fr_measurement.max);
 
     return GST_PAD_PROBE_OK;
 }
@@ -177,11 +186,18 @@ GstPadProbeReturn FRPipeline::fr_warm_up_drop_probe_cb(GstPad *pad,
         return GST_PAD_PROBE_OK;
     }
     
-    guint *counter = reinterpret_cast<guint *>(user_data);
+    ProbeData *probe_data = reinterpret_cast<ProbeData *>(user_data);
+    guint& counter = probe_data->warm_up_frame_counter;
 
-    (*counter)++;
+    // Delete this frame's measurement from the other probes 
+    if (counter < FRPipeline::WARMUP_IGNORE_NO_MEASURE)
+    {
+        probe_data->fr_measurement = {0, 0, 0};
+    }
 
-    if (*counter >= FRPipeline::WARMUP_FRAMES) {
+    counter++;
+
+    if (counter >= FRPipeline::WARMUP_FRAMES) {
 
         std::cout << "[Block Probe] Sending EOS" << std::endl;
 
@@ -202,7 +218,7 @@ GstPadProbeReturn FRPipeline::src_caps_event_probe_cb(GstPad *pad,
                                                       GstPadProbeInfo *info,
                                                       gpointer user_data)
 {
-    if (GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM)
+    if (GST_PAD_PROBE_INFO_TYPE(info))
     {
         GstEvent *event = GST_PAD_PROBE_INFO_EVENT(info);
 
@@ -255,7 +271,7 @@ void FRPipeline::warm_up()
     int drop_probe_id = gst_pad_add_probe(src_pad.get(),
                                           GST_PAD_PROBE_TYPE_BUFFER,
                                           FRPipeline::fr_warm_up_drop_probe_cb,
-                                          &this->warm_up_frame_counter,
+                                          &this->probe_data,
                                           NULL);
 
     gst_fr_element_set_skips(GST_FR_ELEMENT(fr_element.get()), 0);
@@ -314,7 +330,9 @@ void FRPipeline::add_skip_queuing()
     pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
     pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);
 
-    configure_skip_queues(target_fps, fr_measurement.max ? fr_measurement.max : DEFAULT_FR_MAX_LATENCY);
+    configure_skip_queues(target_fps, probe_data.fr_measurement.max     
+                                                        ? probe_data.fr_measurement.max
+                                                        : DEFAULT_FR_MAX_LATENCY);
 }
 
 void FRPipeline::run()
@@ -343,7 +361,7 @@ void FRPipeline::run()
 
             const GstStructure *s = gst_message_get_structure(msg.get());
 
-            if (gst_structure_has_name(s, "reconfigure-fps")) 
+            if (gst_structure_has_name(s, FRPipeline::MSG_RECONFIGURE_FPS)) 
             {
                 std::cout << "[Pipeline] Reconfiguring for new fps";
     
@@ -355,8 +373,8 @@ void FRPipeline::run()
                 // If the new fps is lower than the current Reconfigure the queuing
                 target_fps = new_fps;
 
-                configure_skip_queues(target_fps, fr_measurement.max
-                                                        ? fr_measurement.max
+                configure_skip_queues(target_fps, probe_data.fr_measurement.max
+                                                        ? probe_data.fr_measurement.max
                                                         : DEFAULT_FR_MAX_LATENCY);
             }
             break;

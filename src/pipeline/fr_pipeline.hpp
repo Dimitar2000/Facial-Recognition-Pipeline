@@ -55,36 +55,41 @@ class FRPipeline
         static GstPadProbeReturn src_caps_event_probe_cb(GstPad *pad,
                                                          GstPadProbeInfo *info,
                                                          gpointer user_data);
-
         struct TimeMeasurement {
             GstClockTime base;
             GstClockTime last;
             GstClockTime max;
         };
 
-        ConfigCalculator config_calculator;
-        double target_fps;
-        GstPipelineLM pipeline;
+        struct ProbeData {
+            TimeMeasurement fr_measurement;
+            guint           warm_up_frame_counter;
+        };
 
         // Used to track latency of FR and reconfigure queuing
         //  after warmup and at runtime if the RTS changes
         static const GstClockTime DEFAULT_FR_MAX_LATENCY = 100 * GST_MSECOND;
         static const guint FR_LATENCY_MARGIN_FACTOR = 2;
-        TimeMeasurement fr_measurement;
-
+        
         // Used by the warm up procedure
-        static const guint WARMUP_FRAMES = 10;
-        guint    warm_up_frame_counter;        
+        static const guint WARMUP_FRAMES            = 30;
+        static const guint WARMUP_IGNORE_NO_MEASURE = WARMUP_FRAMES / 2;
 
-        const char * EL_PIPELINE                  = "pipeline";
-        const char * EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";
-        const char * EL_FR_ELEMENT                = "facial_recognition_element";
-        const char * EL_FR_SKIP_QUEUE             = "fr_skip_queue";
-        const char * EL_FRAMERATE                 = "framerate";
-        const char * EL_FRAMERATE_FILTER          = "capsfilter_fps";
-        const char * EL_FR_META_VISUALIZER        = "fr_meta_visualizer";
-        const char * EL_VIDEO_CONVERT_TO_SINK     = "video_convert_to_sink";
-        const char * EL_SINK                      = "sink";
+        static const char * EL_PIPELINE;
+        static const char * EL_VIDEO_CONVERT_FROM_SOURCE;
+        static const char * EL_FR_ELEMENT;
+        static const char * EL_FR_SKIP_QUEUE;
+        static const char * EL_FRAMERATE;
+        static const char * EL_FRAMERATE_FILTER;
+        static const char * EL_FR_META_VISUALIZER;
+        static const char * EL_VIDEO_CONVERT_TO_SINK;
+        static const char * EL_SINK;
 
         static const char * MSG_RECONFIGURE_FPS;
+
+        ConfigCalculator config_calculator;
+        double target_fps;
+        GstPipelineLM pipeline;
+
+        ProbeData probe_data;
 };
