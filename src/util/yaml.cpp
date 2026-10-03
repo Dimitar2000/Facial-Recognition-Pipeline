@@ -4,7 +4,7 @@
 #include <opencv2/core/persistence.hpp>
 #include <utility>
 
-std::vector<FRProcessor::FaceEmbeddings> parse_yaml_embeddings(std::string file_path)
+std::vector<CPUFRProcessor::FaceEmbeddings> parse_yaml_embeddings(std::string file_path)
 {
     cv::FileStorage fs(
         file_path,
@@ -18,13 +18,13 @@ std::vector<FRProcessor::FaceEmbeddings> parse_yaml_embeddings(std::string file_
         throw std::runtime_error("Could not open " + file_path);
     }
 
-    std::vector<FRProcessor::FaceEmbeddings> face_database;
+    std::vector<CPUFRProcessor::FaceEmbeddings> face_database;
 
     cv::FileNode faces = fs["faces"];
 
     for (const auto& face_data: faces)
     {
-        FRProcessor::FaceEmbeddings face_embeddings;
+        CPUFRProcessor::FaceEmbeddings face_embeddings;
 
         face_data["name"]       >> face_embeddings.name;
         face_data["embeddings"] >> face_embeddings.embeddings;

@@ -40,7 +40,7 @@ const GstMetaInfo *fr_metadata_get_info(void)
 gboolean fr_metadata_init(GstMeta *meta, gpointer params, GstBuffer *buffer)
 {
     FRMetadata *m = reinterpret_cast<FRMetadata *>(meta);
-    new (&m->detected_faces) std::vector<FRProcessor::DetectedFace>();
+    new (&m->detected_faces) std::vector<CPUFRProcessor::DetectedFace>();
 
     return TRUE;
 }
@@ -49,7 +49,7 @@ void fr_metadata_free(GstMeta *meta, GstBuffer *buffer)
 {
     FRMetadata *m = reinterpret_cast<FRMetadata *>(meta);
 
-    m->detected_faces.~vector<FRProcessor::DetectedFace>();
+    m->detected_faces.~vector<CPUFRProcessor::DetectedFace>();
 }
 
 gboolean fr_metadata_transform(GstBuffer *dest,

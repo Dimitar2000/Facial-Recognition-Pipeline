@@ -3,6 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "fr/fr_processor.hpp"
+#include "fr/cpu_fr_processor.hpp"
 
-std::vector<FRProcessor::FaceEmbeddings> parse_yaml_embeddings(std::string file_path);
+std::vector<CPUFRProcessor::FaceEmbeddings> parse_yaml_embeddings(std::string file_path);

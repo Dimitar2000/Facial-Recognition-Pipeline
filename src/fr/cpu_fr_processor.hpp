@@ -24,7 +24,7 @@
 //    the person with the highest match score is recorded, with some statistics.
 //
 //
-class FRProcessor
+class CPUFRProcessor
 {
     public:
         struct FaceEmbeddings
@@ -49,10 +49,10 @@ class FRProcessor
             std::optional<Identity> identity;
         };
 
-        FRProcessor(const std::string& face_dataset_file_path,
-                    const std::string& yunet_model_file_path,
-                    const std::string& sface_model_file_path,
-                    int scaled_dim);
+        CPUFRProcessor(const std::string& face_dataset_file_path,
+                       const std::string& yunet_model_file_path,
+                       const std::string& sface_model_file_path,
+                       int scaled_dim);
 
         std::vector<DetectedFace> process_frame(cv::Mat& frame);
 

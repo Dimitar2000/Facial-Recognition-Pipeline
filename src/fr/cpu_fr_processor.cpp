@@ -1,4 +1,4 @@
-#include "fr_processor.hpp"
+#include "cpu_fr_processor.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -12,10 +12,10 @@
 #include "util/record.hpp"
 #include "util/yaml.hpp"
 
-FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
-                         const std::string& yunet_model_file_path,
-                         const std::string& sface_model_file_path,
-                         int scaled_dim)
+CPUFRProcessor::CPUFRProcessor(const std::string& face_dataset_file_path,
+                               const std::string& yunet_model_file_path,
+                               const std::string& sface_model_file_path,
+                               int scaled_dim)
 :   
     scaled_dim(scaled_dim)
 {
@@ -38,7 +38,7 @@ FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
     std::cout << "[FR Processor] Loaded facial recognition models." << std::endl;
 }
 
-std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame)
+std::vector<CPUFRProcessor::DetectedFace> CPUFRProcessor::process_frame(cv::Mat& frame)
 {
     std::vector<DetectedFace> detected_faces;
     TimeRecorder time_recorder;

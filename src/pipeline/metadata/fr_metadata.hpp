@@ -3,14 +3,14 @@
 #include <gst/gstmeta.h>
 #include <vector>
 
-#include "fr/fr_processor.hpp"
+#include "fr/cpu_fr_processor.hpp"
 
 typedef struct FRMetadata {
     GstMeta meta;
 
     int frame_width;
     int frame_heigth;
-    std::vector<FRProcessor::DetectedFace> detected_faces;
+    std::vector<CPUFRProcessor::DetectedFace> detected_faces;
 } FRMetadata;
 
 GType fr_metadata_api_get_type(void);

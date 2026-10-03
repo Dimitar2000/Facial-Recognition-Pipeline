@@ -7,14 +7,14 @@
 #include <gst/video/video-frame.h>
 #include <gst/video/video-info.h>
 
-#include "fr/fr_processor.hpp"
+#include "fr/cpu_fr_processor.hpp"
 #include "pipeline/metadata/fr_metadata.hpp"
 #include "util/record.hpp"
 
 typedef struct _FRElement {
     GstElement element;
     GstPad *sinkpad, *srcpad;
-    FRProcessor *processor;
+    CPUFRProcessor *processor;
     guint skips;
     guint remaining_skips;
 } FRElement;
@@ -84,7 +84,7 @@ void gst_fr_element_init_processor(FRElement *element,
                                    int scaled_dim)
 {
     delete element->processor;
-    element->processor = new FRProcessor(face_dataset_file_path,
+    element->processor = new CPUFRProcessor(face_dataset_file_path,
                                          yunet_model_file_path,
                                          sface_model_file_path,
                                          scaled_dim);
