@@ -89,10 +89,10 @@ void FRPipeline::attach_fr_measurement_probes()
 void FRPipeline::attach_source_caps_event_probe()
 {
     GstElementLM src_video_convert = pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE);
-    GstPadLM sink_pad = gst_element_get_static_pad(src_video_convert.get(), "sink");
+    GstPadLM sink_pad = gst_element_get_static_pad(src_video_convert.get(), "src");
 
     gst_pad_add_probe(sink_pad.get(),
-                      GST_PAD_PROBE_TYPE_BUFFER,
+                      GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
                       FRPipeline::src_caps_event_probe_cb,
                       NULL,
                       NULL);
@@ -218,13 +218,13 @@ GstPadProbeReturn FRPipeline::src_caps_event_probe_cb(GstPad *pad,
                                                       GstPadProbeInfo *info,
                                                       gpointer user_data)
 {
-    if (GST_PAD_PROBE_INFO_TYPE(info))
+    if (GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM)
     {
         GstEvent *event = GST_PAD_PROBE_INFO_EVENT(info);
 
         if (GST_EVENT_TYPE(event) == GST_EVENT_CAPS)
         {
-            std::cout << "[Caps Probe] Source caps renegotiation message intercepted";
+            std::cout << "[Caps Probe] Source caps renegotiation message intercepted" << std::endl;
 
             GstCaps *caps;
 
@@ -234,12 +234,12 @@ GstPadProbeReturn FRPipeline::src_caps_event_probe_cb(GstPad *pad,
 
             if (gst_structure_has_field(s, "framerate")) 
             {
+                std::cout << "[Caps Probe] Sending message to reconfigure" << std::endl;
+
                 // Get the new fps
                 const GValue *fps_v = gst_structure_get_value(s, "framerate");
                 gchar *fps_str = g_strdup_value_contents(fps_v);
-
                 double fps = g_strtod(fps_str, NULL);
-
                 g_free(fps_str);
 
                 // Send a message to reconfigure the pipeline
@@ -247,7 +247,7 @@ GstPadProbeReturn FRPipeline::src_caps_event_probe_cb(GstPad *pad,
 
                 GstStructure *s = gst_structure_new(
                     MSG_RECONFIGURE_FPS,
-                    "fps-n", G_TYPE_DOUBLE, fps,
+                    "fps", G_TYPE_DOUBLE, fps,
                     NULL
                 );
 
@@ -341,29 +341,27 @@ void FRPipeline::run()
     
     gst_element_set_state(pipeline.get(), GST_STATE_PLAYING);
 
-    
-    GstBusLM bus(gst_element_get_bus(pipeline.get()));
-
     bool run = true;
+    GstBusLM bus = gst_element_get_bus(pipeline.get());
 
     while (run)
     {
         GstMessageLM msg(gst_bus_timed_pop_filtered(
             bus.get(),
             GST_CLOCK_TIME_NONE,
-            static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS)));
+            static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS | GST_MESSAGE_APPLICATION)));
 
         switch (GST_MESSAGE_TYPE(msg.get()))
         {
         case GST_MESSAGE_APPLICATION:
         {
-            std::cout << "[Pipeline] Received application message";
+            std::cout << "[Pipeline] Received application message" << std::endl;
 
             const GstStructure *s = gst_message_get_structure(msg.get());
 
             if (gst_structure_has_name(s, FRPipeline::MSG_RECONFIGURE_FPS)) 
             {
-                std::cout << "[Pipeline] Reconfiguring for new fps";
+                std::cout << "[Pipeline] Reconfiguring for new fps" << std::endl;
     
                 double new_fps;
 

@@ -1,6 +1,7 @@
 #include "webcam_fr_pipeline.hpp"
 
 #include <glib-object.h>
+#include <gst/gstvalue.h>
 
 WebcamFRPipeline::WebcamFRPipeline(double target_fps,
                                    std::string face_dataset_file_path,
