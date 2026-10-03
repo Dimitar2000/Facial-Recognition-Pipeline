@@ -1,6 +1,7 @@
 #include <iostream>
 #include <exception>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <gst/gst.h>
 
@@ -112,9 +113,10 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-    catch (std::exception e)
+    catch (std::runtime_error e)
     {
-        std::cerr << "Pipeline could not be created." << std::endl;
+        std::cerr << "Pipeline could not be created.\n" 
+                  << "Reason: " << e.what() << std::endl;
         return 1;
     }
 
@@ -125,7 +127,7 @@ int main(int argc, char *argv[])
         pipeline->add_skip_queuing();
         pipeline->run();
     }
-    catch(std::exception e)
+    catch(std::runtime_error e)
     {
         std::cerr << "Pipeline run stopped!\n" 
                   << "Reason: " << e.what() << std::endl;
