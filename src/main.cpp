@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
     try 
     {
         pipeline->warm_up();
+        pipeline->add_skip_queuing();
         pipeline->run();
     }
     catch(std::exception e)

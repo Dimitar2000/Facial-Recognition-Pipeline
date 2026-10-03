@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <glib-object.h>
 #include <gst/gst.h>
+#include <gst/gstclock.h>
 #include <gst/gstelement.h>
 #include <gst/gstpad.h>
 #include <gst/gstutils.h>
@@ -47,12 +48,6 @@ FRPipeline::FRPipeline(double target_fps,
     pipeline.link_elements(EL_VIDEO_CONVERT_TO_SINK, EL_SINK);
 
     attach_fr_measurement_probes();
-
-    if (target_fps != 0.0)
-    {
-        std::cout << "[Configuration] Extending pipeline with queuing for stable FPS: " << std::endl;
-        extend_for_stable_fps();
-    }
 }
 
 void FRPipeline::attach_fr_measurement_probes()
@@ -74,56 +69,6 @@ void FRPipeline::attach_fr_measurement_probes()
                       FRPipeline::fr_measure_probe_exit_cb,
                       &this->fr_measurement,
                       NULL);
-}
-
-void FRPipeline::extend_for_stable_fps()
-{
-    auto slots = config_calculator.compute_queue_slots(target_fps,
-                                                       1 * GST_MSECOND,
-                                                       1 * GST_MSECOND,
-                                                       200 * GST_MSECOND);
-
-    std::cout << "[Configuration] Configuring skip queue with " << slots << " slots" << std::endl;
-
-    GstElementLM queue(gst_element_factory_make("queue", EL_FR_SKIP_QUEUE));
-
-    g_object_set(queue.get(),
-                 "max-size-buffers", slots,
-                 "max-size-bytes", 0,
-                 "max-size-time", 0,
-                 nullptr);
-
-    std::cout << "[Configuration] Configuring FR element to skip " << slots - 1 << " frames" << std::endl;
-
-    auto *element = GST_FR_ELEMENT(pipeline.get_by_name(EL_FR_ELEMENT));
-    gst_fr_element_set_skips(element, slots - 1);
-
-    std::cout << "[Configuration] Configuring framerate pair with FPS = " << target_fps << std::endl;
-
-    GstElementLM videorate(gst_element_factory_make("videorate", EL_FRAMERATE));
-    GstElementLM capsfilter(gst_element_factory_make("capsfilter", EL_FRAMERATE_FILTER));
-
-    GstCapsLM caps(gst_caps_new_simple("video/x-raw",
-                                       "framerate",
-                                       GST_TYPE_FRACTION,
-                                       static_cast<guint>(target_fps * 100),
-                                       100,
-                                       nullptr));
-
-    g_object_set(capsfilter.get(), "caps", caps.get(), nullptr);
-
-    std::cout << "[Configuration] Inserting new elements" << std::endl;
-
-    pipeline.unlink_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
-
-    pipeline.add_to_pipeline(std::move(queue));
-    pipeline.add_to_pipeline(std::move(videorate));
-    pipeline.add_to_pipeline(std::move(capsfilter));
-
-    pipeline.link_elements(EL_FR_META_VISUALIZER, EL_FR_SKIP_QUEUE);
-    pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);
-    pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
-    pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);
 }
 
 GstPadProbeReturn FRPipeline::fr_measure_probe_entry_cb(GstPad *pad,
@@ -230,6 +175,69 @@ void FRPipeline::warm_up()
     // Remove the dropping probe
     gst_pad_remove_probe(src_pad.get(),drop_probe_id);
 }
+
+void FRPipeline::add_skip_queuing()
+{
+    auto latency_pipeline_base  = 10 * GST_MSECOND;
+    auto latency_queue_overhead = 1 * GST_MSECOND;
+    auto latency_fr_max = fr_measurement.max * FR_LATENCY_MARGIN_FACTOR;
+
+    std::cout << "[Pipeline] Calculating required skip queue size.\n" 
+              << "           Using: \n"
+              << "              Target FPS                 : " << target_fps << "\n"
+              << "              Latency of Base Pipeline   : " << latency_pipeline_base << "\n"
+              << "              Latency of Queue           : " << latency_queue_overhead << "\n"
+              << "              Expected Max Latency of FR : " << latency_fr_max << "\n"
+              << std::endl;
+
+    auto slots = config_calculator.compute_queue_slots(target_fps,
+                                                       latency_pipeline_base,
+                                                       latency_queue_overhead,
+                                                       latency_fr_max);
+
+    std::cout << "[Pipeline] Configuring skip queue with " << slots << " slots" << std::endl;
+
+    GstElementLM queue(gst_element_factory_make("queue", EL_FR_SKIP_QUEUE));
+
+    g_object_set(queue.get(),
+                 "max-size-buffers", slots,
+                 "max-size-bytes", 0,
+                 "max-size-time", 0,
+                 nullptr);
+
+    std::cout << "[Pipeline] Configuring FR element to skip " << slots - 1 << " frames" << std::endl;
+
+    auto *element = GST_FR_ELEMENT(pipeline.get_by_name(EL_FR_ELEMENT));
+    gst_fr_element_set_skips(element, slots - 1);
+
+    std::cout << "[Pipeline] Configuring framerate pair with FPS = " << target_fps << std::endl;
+
+    GstElementLM videorate(gst_element_factory_make("videorate", EL_FRAMERATE));
+    GstElementLM capsfilter(gst_element_factory_make("capsfilter", EL_FRAMERATE_FILTER));
+
+    GstCapsLM caps(gst_caps_new_simple("video/x-raw",
+                                       "framerate",
+                                       GST_TYPE_FRACTION,
+                                       static_cast<guint>(target_fps * 100),
+                                       100,
+                                       nullptr));
+
+    g_object_set(capsfilter.get(), "caps", caps.get(), nullptr);
+
+    std::cout << "[Pipeline] Inserting new elements" << std::endl;
+
+    pipeline.unlink_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
+
+    pipeline.add_to_pipeline(std::move(queue));
+    pipeline.add_to_pipeline(std::move(videorate));
+    pipeline.add_to_pipeline(std::move(capsfilter));
+
+    pipeline.link_elements(EL_FR_META_VISUALIZER, EL_FR_SKIP_QUEUE);
+    pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);
+    pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
+    pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);
+}
+
 
 void FRPipeline::run()
 {
