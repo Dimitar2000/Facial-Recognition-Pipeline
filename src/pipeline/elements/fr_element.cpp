@@ -1,6 +1,5 @@
 #include "fr_element.hpp"
 
-#include <iostream>
 #include <string>
 
 #include <gst/gstclock.h>

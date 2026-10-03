@@ -3,11 +3,11 @@
 #include <gst/gstbin.h>
 #include <gst/gstelement.h>
 #include <gst/gstutils.h>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 
 #ifdef DEBUG
+#include <iostream>
 #define GST_ELEMENT_LM_DEBUG_PRINT(...) __VA_ARGS__
 #else
 #define GST_ELEMENT_LM_DEBUG_PRINT(...)

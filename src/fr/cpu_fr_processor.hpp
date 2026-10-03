@@ -4,7 +4,6 @@
 
 #include <opencv2/core/mat.hpp>
 #include <opencv2/objdetect/face.hpp>
-#include <optional>
 #include <string>
 #include <vector>
 
