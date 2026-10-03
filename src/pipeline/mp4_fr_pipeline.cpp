@@ -26,12 +26,12 @@ MP4FRPipeline::MP4FRPipeline(double target_fps,
 
     pipeline.link_elements("source", "decoder");
 
-    GstElement *video_convert = pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE);
+    GstElementLM video_convert = pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE);
 
-    g_signal_connect(pipeline.get_by_name("decoder"),
+    g_signal_connect(pipeline.get_by_name("decoder").get(),
                      "pad-added",
                      G_CALLBACK(MP4FRPipeline::on_decodebin_pad_added),
-                     video_convert);
+                     video_convert.get());
 }
 
 void MP4FRPipeline::on_decodebin_pad_added(GstElement *, GstPad *new_pad, gpointer user_data)

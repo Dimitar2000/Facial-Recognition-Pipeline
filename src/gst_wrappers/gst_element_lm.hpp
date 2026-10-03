@@ -96,8 +96,8 @@ class GstPipelineLM: public GstElementLM {
 
         GstElement* unpack() = delete;
 
-        GstElement* get_by_name(const std::string& name) const {
-            return gst_bin_get_by_name(GST_BIN(get()), name.c_str());
+        GstElementLM get_by_name(const std::string& name) const {
+            return GstElementLM(gst_bin_get_by_name(GST_BIN(get()), name.c_str()));
         }
 
         void add_to_pipeline(GstElementLM&& element) {

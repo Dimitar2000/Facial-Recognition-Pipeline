@@ -52,11 +52,11 @@ FRPipeline::FRPipeline(double target_fps,
 
 void FRPipeline::attach_fr_measurement_probes()
 {
-    FRElement * fr_element = GST_FR_ELEMENT(pipeline.get_by_name(EL_FR_ELEMENT));
+    GstElementLM fr_element = pipeline.get_by_name(EL_FR_ELEMENT);
 
     // Install a dropping probe to stop the pipeline after N frames
-    GstPadLM sink_pad(gst_element_get_static_pad(GST_ELEMENT(fr_element), "sink"));
-    GstPadLM src_pad(gst_element_get_static_pad(GST_ELEMENT(fr_element), "src"));
+    GstPadLM sink_pad(gst_element_get_static_pad(fr_element.get(), "sink"));
+    GstPadLM src_pad(gst_element_get_static_pad(fr_element.get(), "src"));
 
     gst_pad_add_probe(sink_pad.get(),
                       GST_PAD_PROBE_TYPE_BUFFER,
@@ -95,12 +95,12 @@ void FRPipeline::configure_skip_queues(double target_fps,
 
     std::cout << "[Pipeline] Configuring skip queue with " << slots << " slots" << std::endl;
 
-    GstElement *queue            = pipeline.get_by_name(EL_FR_SKIP_QUEUE);
-    GstElement *framerate_filter = pipeline.get_by_name(EL_FRAMERATE_FILTER);
-    GstElement *element          = pipeline.get_by_name(EL_FR_ELEMENT);
+    GstElementLM queue            = pipeline.get_by_name(EL_FR_SKIP_QUEUE);
+    GstElementLM framerate_filter = pipeline.get_by_name(EL_FRAMERATE_FILTER);
+    GstElementLM element          = pipeline.get_by_name(EL_FR_ELEMENT);
 
     // Set queue size
-    g_object_set(queue,
+    g_object_set(queue.get(),
                  "max-size-buffers", slots,
                  "max-size-bytes", 0,
                  "max-size-time", 0,
@@ -109,7 +109,7 @@ void FRPipeline::configure_skip_queues(double target_fps,
     // Set FR skips
     std::cout << "[Pipeline] Configuring FR element to skip " << slots - 1 << " frames" << std::endl;
 
-    gst_fr_element_set_skips(GST_FR_ELEMENT(element), slots - 1);
+    gst_fr_element_set_skips(GST_FR_ELEMENT(element.get()), slots - 1);
 
     std::cout << "[Pipeline] Configuring framerate pair with FPS = " << target_fps << std::endl;
 
@@ -121,7 +121,7 @@ void FRPipeline::configure_skip_queues(double target_fps,
                                        100,
                                        nullptr));
 
-    g_object_set(framerate_filter, "caps", caps.get(), nullptr);
+    g_object_set(framerate_filter.get(), "caps", caps.get(), nullptr);
 
 }
 
@@ -182,10 +182,10 @@ GstPadProbeReturn FRPipeline::fr_warm_up_drop_probe_cb(GstPad *pad,
 
 void FRPipeline::warm_up()
 {
-    FRElement * fr_element = GST_FR_ELEMENT(pipeline.get_by_name(EL_FR_ELEMENT));
+    GstElementLM fr_element = pipeline.get_by_name(EL_FR_ELEMENT);
 
     // Install a dropping probe to stop the pipeline after N frames
-    GstPadLM src_pad(gst_element_get_static_pad(GST_ELEMENT(fr_element), "src"));
+    GstPadLM src_pad(gst_element_get_static_pad(fr_element.get(), "src"));
 
     int drop_probe_id = gst_pad_add_probe(src_pad.get(),
                                           GST_PAD_PROBE_TYPE_BUFFER,
@@ -193,7 +193,7 @@ void FRPipeline::warm_up()
                                           &this->warm_up_frame_counter,
                                           NULL);
 
-    gst_fr_element_set_skips(fr_element, 0);
+    gst_fr_element_set_skips(GST_FR_ELEMENT(fr_element.get()), 0);
 
     // Run the pipeline until the drop probe sends EOS
     std::cout << "[Pipeline] Starting warm up." << std::endl;
