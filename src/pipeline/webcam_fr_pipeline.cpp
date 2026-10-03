@@ -1,7 +1,6 @@
 #include "webcam_fr_pipeline.hpp"
 
 #include <glib-object.h>
-#include <utility>
 
 WebcamFRPipeline::WebcamFRPipeline(double target_fps,
                                    std::string face_dataset_file_path,
@@ -22,9 +21,9 @@ WebcamFRPipeline::WebcamFRPipeline(double target_fps,
                                        NULL));
     g_object_set(caps_filter.get(), "caps", caps.get(), NULL);
 
-    pipeline.add_to_pipeline(std::move(source));
-    pipeline.add_to_pipeline(std::move(caps_filter));
-    pipeline.add_to_pipeline(std::move(mjpeg));
+    pipeline.add_to_pipeline(source);
+    pipeline.add_to_pipeline(caps_filter);
+    pipeline.add_to_pipeline(mjpeg);
 
     pipeline.link_elements("source", "resolution");
     pipeline.link_elements("resolution", "jpeg_decoder");

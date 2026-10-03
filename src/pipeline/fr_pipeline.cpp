@@ -9,7 +9,6 @@
 #include <gst/gstutils.h>
 #include <iostream>
 #include <stdexcept>
-#include <utility>
 
 #include "elements/fr_element.hpp"
 #include "gst_wrappers/gst_element_lm.hpp"
@@ -36,11 +35,11 @@ FRPipeline::FRPipeline(double target_fps,
                                   sface_model_file_path,
                                   1024);
 
-    pipeline.add_to_pipeline(std::move(video_convert));
-    pipeline.add_to_pipeline(std::move(fr_element));
-    pipeline.add_to_pipeline(std::move(fr_meta_visualizer));
-    pipeline.add_to_pipeline(std::move(video_convert2));
-    pipeline.add_to_pipeline(std::move(sink));
+    pipeline.add_to_pipeline(video_convert);
+    pipeline.add_to_pipeline(fr_element);
+    pipeline.add_to_pipeline(fr_meta_visualizer);
+    pipeline.add_to_pipeline(video_convert2);
+    pipeline.add_to_pipeline(sink);
 
     pipeline.link_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_FR_ELEMENT);
     pipeline.link_elements(EL_FR_ELEMENT, EL_FR_META_VISUALIZER);
@@ -240,9 +239,9 @@ void FRPipeline::add_skip_queuing()
 
     pipeline.unlink_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
 
-    pipeline.add_to_pipeline(std::move(queue));
-    pipeline.add_to_pipeline(std::move(videorate));
-    pipeline.add_to_pipeline(std::move(capsfilter));
+    pipeline.add_to_pipeline(queue);
+    pipeline.add_to_pipeline(videorate);
+    pipeline.add_to_pipeline(capsfilter);
 
     pipeline.link_elements(EL_FR_META_VISUALIZER, EL_FR_SKIP_QUEUE);
     pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);

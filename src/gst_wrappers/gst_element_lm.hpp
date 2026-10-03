@@ -64,6 +64,9 @@ class GstElementLM {
         
 
         GstElement* get() const {
+            if (!element) {
+                throw std::runtime_error("Trying to get a missing element! It was probably moved.");
+            }
             return element;
         }
 
@@ -89,8 +92,8 @@ class GstPipelineLM: public GstElementLM {
         }
 
         ~GstPipelineLM() {
-            if (get()) {
-                gst_element_set_state(get(), GST_STATE_NULL);
+            if (element) {
+                gst_element_set_state(element, GST_STATE_NULL);
             }
         }
 
@@ -100,7 +103,7 @@ class GstPipelineLM: public GstElementLM {
             return GstElementLM(gst_bin_get_by_name(GST_BIN(get()), name.c_str()));
         }
 
-        void add_to_pipeline(GstElementLM&& element) {
+        void add_to_pipeline(GstElementLM& element) {
             bool res = gst_bin_add(GST_BIN(get()), element.get());
 
             if (res != TRUE) {
@@ -168,6 +171,9 @@ class GstBusLM {
         }
 
         GstBus* get() const {
+            if (!bus) {
+                throw std::runtime_error("Trying to get a missing bus!");
+            }
             return bus;
         }
 
@@ -214,6 +220,9 @@ class GstMessageLM {
         }
 
         GstMessage* get() const {
+            if (!msg) {
+                throw std::runtime_error("Trying to get a missing msg!");
+            }
             return msg;
         }
 
@@ -263,6 +272,9 @@ class GstCapsLM {
         }
 
         GstCaps* get() const {
+            if (!caps) {
+                throw std::runtime_error("Trying to get a missing caps!");
+            }
             return caps;
         }
 
@@ -310,6 +322,9 @@ class GstPadLM {
         }
 
         GstPad* get() const {
+            if (!pad) {
+                throw std::runtime_error("Trying to get a missing pad!");
+            }
             return pad;
         }
 

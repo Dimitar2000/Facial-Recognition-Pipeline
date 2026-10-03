@@ -3,7 +3,6 @@
 #include <gst/gst.h>
 #include <stdexcept>
 #include <string>
-#include <utility>
 
 
 MP4FRPipeline::MP4FRPipeline(double target_fps,
@@ -21,8 +20,8 @@ MP4FRPipeline::MP4FRPipeline(double target_fps,
 
     g_object_set(source.get(), "location", input_mp4_file_path.c_str(), NULL);
 
-    pipeline.add_to_pipeline(std::move(source));
-    pipeline.add_to_pipeline(std::move(decoder));
+    pipeline.add_to_pipeline(source);
+    pipeline.add_to_pipeline(decoder);
 
     pipeline.link_elements("source", "decoder");
 
