@@ -88,10 +88,10 @@ void FRPipeline::attach_fr_measurement_probes()
 
 void FRPipeline::attach_source_caps_event_probe()
 {
-    GstElementLM src_video_convert = pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE);
-    GstPadLM sink_pad = gst_element_get_static_pad(src_video_convert.get(), "src");
+    GstElementLM source = get_source();
+    GstPadLM src_pad = gst_element_get_static_pad(source.get(), "src");
 
-    gst_pad_add_probe(sink_pad.get(),
+    gst_pad_add_probe(src_pad.get(),
                       GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
                       FRPipeline::src_caps_event_probe_cb,
                       NULL,

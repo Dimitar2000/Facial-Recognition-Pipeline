@@ -32,6 +32,8 @@ class FRPipeline
                    std::string face_dataset_file_path,
                    std::string yunet_model_file_path,
                    std::string sface_model_file_path);
+        
+        virtual GstElementLM get_source() = 0;
 
         void attach_fr_measurement_probes();
 

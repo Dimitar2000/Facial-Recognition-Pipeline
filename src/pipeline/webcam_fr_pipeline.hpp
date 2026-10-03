@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fr_pipeline.hpp"
+#include "gst_wrappers/gst_element_lm.hpp"
 
 class WebcamFRPipeline : public FRPipeline
 {
@@ -13,4 +14,6 @@ class WebcamFRPipeline : public FRPipeline
                          std::string sface_model_file_path);
 
         ~WebcamFRPipeline() override = default;
+
+        virtual GstElementLM get_source() override;
 };

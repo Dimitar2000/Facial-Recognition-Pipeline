@@ -16,6 +16,8 @@ class MP4FRPipeline : public FRPipeline
 
         ~MP4FRPipeline() override = default;
 
+        virtual GstElementLM get_source() override;
+
     private:
         static void on_decodebin_pad_added(GstElement *element, GstPad *new_pad, gpointer user_data);
 };

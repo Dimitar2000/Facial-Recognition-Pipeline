@@ -19,6 +19,7 @@ WebcamFRPipeline::WebcamFRPipeline(double target_fps,
     GstCapsLM caps(gst_caps_new_simple("image/jpeg",
                                        "width", G_TYPE_INT, 1920,
                                        "height", G_TYPE_INT, 1080,
+                                       "framerate", GST_TYPE_FRACTION_RANGE, 1, 1, 60, 1,
                                        NULL));
     g_object_set(caps_filter.get(), "caps", caps.get(), NULL);
 
@@ -29,4 +30,9 @@ WebcamFRPipeline::WebcamFRPipeline(double target_fps,
     pipeline.link_elements("source", "resolution");
     pipeline.link_elements("resolution", "jpeg_decoder");
     pipeline.link_elements("jpeg_decoder", EL_VIDEO_CONVERT_FROM_SOURCE);
+}
+
+GstElementLM WebcamFRPipeline::get_source()
+{
+    return pipeline.get_by_name("source");
 }

@@ -33,6 +33,11 @@ MP4FRPipeline::MP4FRPipeline(double target_fps,
                      video_convert.get());
 }
 
+GstElementLM MP4FRPipeline::get_source()
+{
+    return pipeline.get_by_name("source");
+}
+
 void MP4FRPipeline::on_decodebin_pad_added(GstElement *, GstPad *new_pad, gpointer user_data)
 {
     GstElement *video_convert = GST_ELEMENT(user_data);
