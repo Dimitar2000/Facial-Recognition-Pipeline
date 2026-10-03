@@ -27,13 +27,15 @@ FRProcessor::FRProcessor(const std::string& face_dataset_file_path,
         throw std::runtime_error("No embeddings were loaded.");
     }
 
+    std::cout << "[FR Processor] Loaded embeddings." << std::endl;
+
     face_detector = cv::FaceDetectorYN::create(yunet_model_file_path,
                                                "",
                                                cv::Size(0, 0));
     face_recogniser = cv::FaceRecognizerSF::create(sface_model_file_path, 
                                                    "");
 
-    std::cout << "Loaded facial recognition models." << std::endl;
+    std::cout << "[FR Processor] Loaded facial recognition models." << std::endl;
 }
 
 std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame)
@@ -69,7 +71,6 @@ std::vector<FRProcessor::DetectedFace> FRProcessor::process_frame(cv::Mat& frame
 
     if (faces.empty())
     {
-        std::cout << "No faces detected\n";
         return detected_faces;
     }
 

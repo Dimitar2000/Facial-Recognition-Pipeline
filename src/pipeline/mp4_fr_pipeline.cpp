@@ -48,7 +48,7 @@ void MP4FRPipeline::on_decodebin_pad_added(GstElement *, GstPad *new_pad, gpoint
         return;
     }
 
-    GstCapsLM caps(gst_pad_get_current_caps(new_pad), true);
+    GstCapsLM caps;
 
     try
     {
@@ -79,5 +79,5 @@ void MP4FRPipeline::on_decodebin_pad_added(GstElement *, GstPad *new_pad, gpoint
         throw std::runtime_error("Could not link decoded video pad " + std::to_string(result) + ").\n");
     }
 
-    g_printerr("Decodebin pad added and linked successfully.\n");
+    g_printerr("[MP4 Pipeline] Decodebin pad added and linked successfully.\n");
 }

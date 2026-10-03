@@ -7,6 +7,12 @@
 #include <stdexcept>
 #include <string>
 
+#ifdef DEBUG
+#define GST_ELEMENT_LM_DEBUG_PRINT(...) __VA_ARGS__
+#else
+#define GST_ELEMENT_LM_DEBUG_PRINT(...)
+#endif
+
 // Helper Life Management class for GstElement
 // It takes care of unrefing the GstElement when it goes out of scope
 // Also it makes sure if the element passed is null
@@ -44,11 +50,11 @@ class GstElementLM {
 
         ~GstElementLM() {
             if (element) {
-                std::cout << "Unrefing GstElement: " << GST_ELEMENT_NAME(element) << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstElement: " << GST_ELEMENT_NAME(element) << std::endl;)
                 gst_object_unref(element);
             }
             else {
-                std::cout << "Skipping unrefing GstElement since it is null" << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstElement since it is null" << std::endl;)
             }
         }
 
@@ -107,7 +113,7 @@ class GstPipelineLM: public GstElementLM {
             bool res = gst_bin_add(GST_BIN(get()), element.get());
 
             if (res != TRUE) {
-                g_printerr("Element could not be added to pipeline.\n");
+                GST_ELEMENT_LM_DEBUG_PRINT(g_printerr("Element could not be added to pipeline.\n");)
                 throw std::runtime_error("Failed to add element to pipeline");
             }
             
@@ -119,7 +125,7 @@ class GstPipelineLM: public GstElementLM {
             GstElement* element2 = gst_bin_get_by_name(GST_BIN(get()), el2.c_str());
 
             if (gst_element_link(element1, element2) != TRUE) {
-                g_printerr("Elements could not be linked.\n");
+                GST_ELEMENT_LM_DEBUG_PRINT(g_printerr("Elements could not be linked.\n");)
                 throw std::runtime_error("Pipeline elements could not be linked");
             }
         }
@@ -162,11 +168,11 @@ class GstBusLM {
 
         ~GstBusLM() {
             if (bus) {
-                std::cout << "Unrefing GstBus" << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstBus" << std::endl;)
                 gst_object_unref(bus);
             }
             else {
-                std::cout << "Skipping unrefing GstBus since it is null" << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstBus since it is null" << std::endl;)
             }
         }
 
@@ -211,11 +217,11 @@ class GstMessageLM {
 
         ~GstMessageLM() {
             if (msg) {
-                std::cout << "Unrefing GstMessage: " << GST_MESSAGE_TYPE(msg) << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstMessage: " << GST_MESSAGE_TYPE(msg) << std::endl;)
                 gst_message_unref(msg);
             }
             else {
-                std::cout << "Skipping unrefing GstMessage since it is null" << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstMessage since it is null" << std::endl;)
             }
         }
 
@@ -263,11 +269,11 @@ class GstCapsLM {
 
         ~GstCapsLM() {
             if (caps) {
-                std::cout << "Unrefing GstCaps" << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstCaps" << std::endl;)
                 gst_caps_unref(caps);
             }
             else {
-                std::cout << "Skipping unrefing GstCaps since it is null" << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstCaps since it is null" << std::endl;)
             }
         }
 
@@ -313,11 +319,11 @@ class GstPadLM {
 
         ~GstPadLM() {
             if (pad) {
-                std::cout << "Unrefing GstPad" << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstPad" << std::endl;)
                 gst_object_unref(pad);
             }
             else {
-                std::cout << "Skipping unrefing GstPad since it is null" << std::endl;
+                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstPad since it is null" << std::endl;)
             }
         }
 
@@ -331,3 +337,5 @@ class GstPadLM {
     protected:
         GstPad* pad;
 };
+
+#undef GST_ELEMENT_LM_DEBUG_PRINT

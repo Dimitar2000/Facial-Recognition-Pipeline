@@ -11,12 +11,16 @@
 #include "pipeline/mp4_fr_pipeline.hpp"
 #include "pipeline/webcam_fr_pipeline.hpp"
 
+#define DEBUG
+
 const std::string HELP_MESSAGE = "Not enough arguments. Format is: \n"
                                  "  <app> webcam <fps> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path>\n"
                                  "  <app> mp4    <fps> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path> <input-mp4-file-path>\n";
 
 int main(int argc, char *argv[])
 {
+    std::cout << "===================" << std::endl;
+
     // Initialize GStreamer
     gst_init (&argc, &argv);
     

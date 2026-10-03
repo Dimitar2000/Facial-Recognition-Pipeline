@@ -106,7 +106,7 @@ void FRPipeline::configure_skip_queues(double target_fps,
     auto latency_queue_overhead = 1 * GST_MSECOND;
     auto latency_fr_max = max_fr_latency * FR_LATENCY_MARGIN_FACTOR;
 
-    std::cout << "[Pipeline] Calculating required skip queue size.\n" 
+    std::cout << "[Pipeline] Calculating required skip queue size\n" 
               << "           Using: \n"
               << "              Target FPS                 : " << target_fps << "\n"
               << "              Latency of Base Pipeline   : " << latency_pipeline_base << "\n"
@@ -179,7 +179,7 @@ GstPadProbeReturn FRPipeline::fr_warm_up_drop_probe_cb(GstPad *pad,
                                                        GstPadProbeInfo *info,
                                                        gpointer user_data)
 {
-    std::cout << "[Block Probe] Stopping warm up frame" << std::endl;
+    std::cout << "[Block Probe] Dropping warm up frame ..." << std::endl;
 
     if (!(info->type & GST_PAD_PROBE_TYPE_BUFFER))
     {
@@ -199,7 +199,7 @@ GstPadProbeReturn FRPipeline::fr_warm_up_drop_probe_cb(GstPad *pad,
 
     if (counter >= FRPipeline::WARMUP_FRAMES) {
 
-        std::cout << "[Block Probe] Sending EOS" << std::endl;
+        std::cout << "[Block Probe] Sending EOS ..." << std::endl;
 
         GstElementLM pipeline(GST_ELEMENT(
             gst_pad_get_parent_element(pad)
@@ -224,7 +224,7 @@ GstPadProbeReturn FRPipeline::src_caps_event_probe_cb(GstPad *pad,
 
         if (GST_EVENT_TYPE(event) == GST_EVENT_CAPS)
         {
-            std::cout << "[Caps Probe] Source caps renegotiation message intercepted" << std::endl;
+            std::cout << "[Caps Probe] Source caps renegotiation message intercepted." << std::endl;
 
             GstCaps *caps;
 
@@ -234,7 +234,7 @@ GstPadProbeReturn FRPipeline::src_caps_event_probe_cb(GstPad *pad,
 
             if (gst_structure_has_field(s, "framerate")) 
             {
-                std::cout << "[Caps Probe] Sending message to reconfigure" << std::endl;
+                std::cout << "[Caps Probe] Sending message to reconfigure ..." << std::endl;
 
                 // Get the new fps
                 const GValue *fps_v = gst_structure_get_value(s, "framerate");
@@ -277,7 +277,7 @@ void FRPipeline::warm_up()
     gst_fr_element_set_skips(GST_FR_ELEMENT(fr_element.get()), 0);
 
     // Run the pipeline until the drop probe sends EOS
-    std::cout << "[Pipeline] Starting warm up." << std::endl;
+    std::cout << "[Pipeline] Starting warm up ..." << std::endl;
 
     gst_element_set_state(pipeline.get(), GST_STATE_PLAYING);
 
@@ -355,13 +355,13 @@ void FRPipeline::run()
         {
         case GST_MESSAGE_APPLICATION:
         {
-            std::cout << "[Pipeline] Received application message" << std::endl;
+            std::cout << "[Pipeline] Received application message." << std::endl;
 
             const GstStructure *s = gst_message_get_structure(msg.get());
 
             if (gst_structure_has_name(s, FRPipeline::MSG_RECONFIGURE_FPS)) 
             {
-                std::cout << "[Pipeline] Reconfiguring for new fps" << std::endl;
+                std::cout << "[Pipeline] Reconfiguring for new fps ..." << std::endl;
     
                 double new_fps;
 
@@ -380,7 +380,7 @@ void FRPipeline::run()
 
         case GST_MESSAGE_EOS:
         {
-            g_print("End-Of-Stream reached.\n");
+            g_print("[Pipeline] End-Of-Stream reached.\n");
 
             run = false;
 
@@ -390,24 +390,19 @@ void FRPipeline::run()
         case GST_MESSAGE_ERROR:
         {
             GError *err;
-            gchar *debug_info;
         
-            gst_message_parse_error(msg.get(), &err, &debug_info);
-            g_printerr("Error received from element %s: %s\n",
-                    GST_OBJECT_NAME(msg.get()->src), err->message);
-            g_printerr("Debugging information: %s\n",
-                    debug_info ? debug_info : "none");
-            g_clear_error(&err);
-            g_free(debug_info);
+            gst_message_parse_error(msg.get(), &err, NULL);
 
+            g_printerr("[Pipeline] Error received from element %s: %s\n", GST_OBJECT_NAME(msg.get()->src), err->message);
             run = false;
 
+            g_clear_error(&err);
             break;
         }
 
         default:
         {
-            g_printerr("Unexpected message received.\n");
+            throw std::runtime_error("Unexpected message received.");
             break;
         }
         }

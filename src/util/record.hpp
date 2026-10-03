@@ -4,6 +4,12 @@
 #include <cstdio>
 #include <string>
 
+#ifdef DEBUG
+#define TIME_RECORDER_DEBUG_PRINT(...) __VA_ARGS__
+#else
+#define TIME_RECORDER_DEBUG_PRINT(...)
+#endif
+
 class TimeRecorder
 {
     public:
@@ -20,7 +26,9 @@ class TimeRecorder
             auto elapsed = Clock::now() - clock_time_base;
             auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed);
 
-            std::printf("%-15s :%10lld\n", work.c_str(), static_cast<long long>(elapsed_ns.count()));
+            TIME_RECORDER_DEBUG_PRINT(
+                std::printf("%-15s :%10lld\n", work.c_str(), static_cast<long long>(elapsed_ns.count()));
+            )
         }
 
     private:

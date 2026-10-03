@@ -179,7 +179,6 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
     gst_caps_unref(caps);
 
     time_recorder.stop();
-    std::cout << "==========" << std::endl;
 
     return gst_pad_push(element->srcpad, buf);
 }

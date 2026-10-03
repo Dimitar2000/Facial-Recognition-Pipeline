@@ -30,7 +30,7 @@ std::vector<FRProcessor::FaceEmbeddings> parse_yaml_embeddings(std::string file_
         face_data["embeddings"] >> face_embeddings.embeddings;
         face_database.push_back(std::move(face_embeddings));
 
-        std::cout << "Loaded " << face_database.back().embeddings.size() << " face embeddings for " << face_database.back().name << ".\n";
+        std::cout << "[YAML] Read " << face_database.back().embeddings.size() << " face embeddings for " << face_database.back().name << ".\n";
     }
 
     fs.release();
