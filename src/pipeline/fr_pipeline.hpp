@@ -35,6 +35,8 @@ class FRPipeline
 
         void attach_fr_measurement_probes();
 
+        void attach_source_caps_event_probe();
+
         void configure_skip_queues(double target_fps, 
                                    GstClockTime max_fr_latency);
 
@@ -49,6 +51,10 @@ class FRPipeline
         static GstPadProbeReturn fr_warm_up_drop_probe_cb(GstPad *pad,
                                                           GstPadProbeInfo *info,
                                                           gpointer user_data);
+
+        static GstPadProbeReturn src_caps_event_probe_cb(GstPad *pad,
+                                                         GstPadProbeInfo *info,
+                                                         gpointer user_data);
 
         struct TimeMeasurement {
             GstClockTime base;
@@ -79,4 +85,6 @@ class FRPipeline
         const char * EL_FR_META_VISUALIZER        = "fr_meta_visualizer";
         const char * EL_VIDEO_CONVERT_TO_SINK     = "video_convert_to_sink";
         const char * EL_SINK                      = "sink";
+
+        static const char * MSG_RECONFIGURE_FPS;
 };

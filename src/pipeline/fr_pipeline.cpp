@@ -1,17 +1,23 @@
 #include "fr_pipeline.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <glib-object.h>
+#include <glib.h>
 #include <gst/gst.h>
 #include <gst/gstclock.h>
 #include <gst/gstelement.h>
+#include <gst/gstevent.h>
 #include <gst/gstpad.h>
+#include <gst/gststructure.h>
 #include <gst/gstutils.h>
 #include <iostream>
 #include <stdexcept>
 
 #include "elements/fr_element.hpp"
 #include "gst_wrappers/gst_element_lm.hpp"
+
+const char * FRPipeline::MSG_RECONFIGURE_FPS = "reconfigure-fps";
 
 FRPipeline::FRPipeline(double target_fps,
                        std::string face_dataset_file_path,
@@ -69,6 +75,19 @@ void FRPipeline::attach_fr_measurement_probes()
                       &this->fr_measurement,
                       NULL);
 }
+
+void FRPipeline::attach_source_caps_event_probe()
+{
+    GstElementLM src_video_convert = pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE);
+    GstPadLM sink_pad = gst_element_get_static_pad(src_video_convert.get(), "sink");
+
+    gst_pad_add_probe(sink_pad.get(),
+                      GST_PAD_PROBE_TYPE_BUFFER,
+                      FRPipeline::src_caps_event_probe_cb,
+                      NULL,
+                      NULL);
+}
+
 
 void FRPipeline::configure_skip_queues(double target_fps, 
                                        GstClockTime max_fr_latency)
@@ -179,6 +198,53 @@ GstPadProbeReturn FRPipeline::fr_warm_up_drop_probe_cb(GstPad *pad,
     return GST_PAD_PROBE_DROP;
 }
 
+GstPadProbeReturn FRPipeline::src_caps_event_probe_cb(GstPad *pad,
+                                                      GstPadProbeInfo *info,
+                                                      gpointer user_data)
+{
+    if (GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM)
+    {
+        GstEvent *event = GST_PAD_PROBE_INFO_EVENT(info);
+
+        if (GST_EVENT_TYPE(event) == GST_EVENT_CAPS)
+        {
+            std::cout << "[Caps Probe] Source caps renegotiation message intercepted";
+
+            GstCaps *caps;
+
+            gst_event_parse_caps(event, &caps);
+
+            const GstStructure *s = gst_caps_get_structure(caps, 0);
+
+            if (gst_structure_has_field(s, "framerate")) 
+            {
+                // Get the new fps
+                const GValue *fps_v = gst_structure_get_value(s, "framerate");
+                gchar *fps_str = g_strdup_value_contents(fps_v);
+
+                double fps = g_strtod(fps_str, NULL);
+
+                g_free(fps_str);
+
+                // Send a message to reconfigure the pipeline
+                GstElementLM pipeline(GST_ELEMENT(gst_pad_get_parent_element(pad)));
+
+                GstStructure *s = gst_structure_new(
+                    MSG_RECONFIGURE_FPS,
+                    "fps-n", G_TYPE_DOUBLE, fps,
+                    NULL
+                );
+
+                GstMessage *msg = gst_message_new_application(GST_OBJECT(pipeline.get()), s);
+
+                gst_element_post_message(pipeline.get(), msg);
+            }
+        }
+    }
+
+    return GST_PAD_PROBE_OK;
+}
+
 void FRPipeline::warm_up()
 {
     GstElementLM fr_element = pipeline.get_by_name(EL_FR_ELEMENT);
@@ -253,6 +319,8 @@ void FRPipeline::add_skip_queuing()
 
 void FRPipeline::run()
 {
+    attach_source_caps_event_probe();
+    
     gst_element_set_state(pipeline.get(), GST_STATE_PLAYING);
 
     GstBusLM bus(gst_element_get_bus(pipeline.get()));
