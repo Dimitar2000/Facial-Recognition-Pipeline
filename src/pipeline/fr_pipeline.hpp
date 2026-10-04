@@ -77,7 +77,7 @@ class FRPipeline
         // Used to track latency of FR and reconfigure queuing
         //  after warmup and at runtime if the RTS changes
         static const GstClockTime DEFAULT_FR_MAX_LATENCY = 100 * GST_MSECOND;
-        static const guint FR_LATENCY_MARGIN_FACTOR = 2;
+        static constexpr double FR_LATENCY_MARGIN_FACTOR = 1.3;
         
         // Used by the warm up procedure
         static const guint WARMUP_FRAMES            = 30;

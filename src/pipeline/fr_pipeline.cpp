@@ -442,9 +442,7 @@ void FRPipeline::run()
                 // If the new fps is lower than the current Reconfigure the queuing
                 target_fps = new_fps;
 
-                configure_skip_queues(target_fps, probe_data.fr_measurement.max
-                                                        ? probe_data.fr_measurement.max
-                                                        : DEFAULT_FR_MAX_LATENCY);
+                configure_skip_queues(target_fps, probe_data.fr_measurement.max);
             }
             break;
         }
