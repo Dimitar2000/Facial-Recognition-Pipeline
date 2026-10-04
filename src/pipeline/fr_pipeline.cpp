@@ -238,10 +238,20 @@ GstPadProbeReturn FRPipeline::src_caps_event_probe_cb(GstPad *pad,
                 std::cout << "[Caps Probe] Sending message to reconfigure ..." << std::endl;
 
                 // Get the new fps
-                const GValue *fps_v = gst_structure_get_value(s, "framerate");
-                gchar *fps_str = g_strdup_value_contents(fps_v);
-                double fps = g_strtod(fps_str, NULL);
-                g_free(fps_str);
+                gint fps_numerator = 0;
+                gint fps_denominator = 0;
+
+                if (!gst_structure_get_fraction(s, 
+                                                "framerate",
+                                                &fps_numerator, 
+                                                &fps_denominator) 
+                    || fps_denominator == 0)
+                {
+                    throw std::runtime_error("[Caps Probe] Could not read a valid framerate fraction.");
+                    return GST_PAD_PROBE_OK;
+                }
+
+                double fps = static_cast<double>(fps_numerator) / fps_denominator;
 
                 // Send a message to reconfigure the pipeline
                 GstElementLM pipeline(GST_ELEMENT(gst_pad_get_parent_element(pad)));
