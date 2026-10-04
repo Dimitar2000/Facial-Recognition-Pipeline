@@ -190,6 +190,18 @@ GstPadProbeReturn FRPipeline::fr_measure_probe_exit_cb(GstPad *pad,
     return GST_PAD_PROBE_OK;
 }
 
+void FRPipeline::adjust_for_fr_max_measure()
+{
+    std::cout << "[Pipeline] Checking current max measurement ... " << std::endl;
+
+    if (probe_data.fr_measurement.max > expected_max_fr_latency)
+    {
+        std::cout << "[Pipeline] Reconfiguring for new max FR latency ..." << std::endl;
+
+        configure_skip_queues(target_fps, probe_data.fr_measurement.max);
+    }
+}
+
 GstPadProbeReturn FRPipeline::fr_warm_up_drop_probe_cb(GstPad *pad,
                                                        GstPadProbeInfo *info,
                                                        gpointer user_data)
@@ -284,6 +296,18 @@ GstPadProbeReturn FRPipeline::src_caps_event_probe_cb(GstPad *pad,
     }
 
     return GST_PAD_PROBE_OK;
+}
+
+void FRPipeline::handle_msg_reconfigure_fps(const GstStructure * s)
+{
+    // Extract the new fps
+    double new_fps;
+    gst_structure_get_double(s, "fps", &new_fps);
+
+    std::cout << "[Pipeline] Reconfiguring for new fps ..." << std::endl;
+
+    target_fps = new_fps;
+    configure_skip_queues(target_fps, probe_data.fr_measurement.max);
 }
 
 void FRPipeline::warm_up()
@@ -419,62 +443,43 @@ void FRPipeline::run()
         // When no new message is received, check if the maximum detected latency has changed
         if (!m)
         {
-            std::cout << "[Pipeline] Checking current max measurement ... " << std::endl;
-
-            if (probe_data.fr_measurement.max > expected_max_fr_latency)
-            {
-                std::cout << "[Pipeline] Reconfiguring for new max FR latency ..." << std::endl;
-
-                configure_skip_queues(target_fps, probe_data.fr_measurement.max);
-            }
-
+            adjust_for_fr_max_measure();
             continue;
         }
 
-        // Process a new message
+        // Handle a new message
         GstMessageLM msg(m);
 
         switch (GST_MESSAGE_TYPE(msg.get()))
         {
+
         case GST_MESSAGE_APPLICATION:
         {
-            std::cout << "[Pipeline] Received application message." << std::endl;
+            std::cout << "[Pipeline] Handling application message ..." << std::endl;
 
             const GstStructure *s = gst_message_get_structure(msg.get());
 
             if (gst_structure_has_name(s, FRPipeline::MSG_RECONFIGURE_FPS)) 
             {
-                std::cout << "[Pipeline] Reconfiguring for new fps ..." << std::endl;
-    
-                double new_fps;
-
-                // Extract the new fps
-                gst_structure_get_double(s, "fps", &new_fps);
-
-                // If the new fps is lower than the current Reconfigure the queuing
-                target_fps = new_fps;
-
-                configure_skip_queues(target_fps, probe_data.fr_measurement.max);
+                handle_msg_reconfigure_fps(s);
             }
-            break;
+            
+            throw std::runtime_error("Unknown application message structure!");
         }
 
         case GST_MESSAGE_EOS:
         {
             g_print("[Pipeline] End-Of-Stream reached.\n");
-
             run = false;
-
             break;
         }
 
         case GST_MESSAGE_ERROR:
         {
             GError *err;
-        
             gst_message_parse_error(msg.get(), &err, NULL);
-
             g_printerr("[Pipeline] Error received from element %s: %s\n", GST_OBJECT_NAME(msg.get()->src), err->message);
+
             run = false;
 
             g_clear_error(&err);
@@ -484,7 +489,6 @@ void FRPipeline::run()
         default:
         {
             throw std::runtime_error("Unexpected message received.");
-            break;
         }
         }
     }

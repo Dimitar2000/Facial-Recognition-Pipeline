@@ -49,6 +49,7 @@ class FRPipeline
         void configure_skip_queues(double target_fps, 
                                    GstClockTime max_fr_latency);
 
+        // FR latency measurement and adjusrtment
         static GstPadProbeReturn fr_measure_probe_entry_cb(GstPad *pad,
                                                            GstPadProbeInfo *info,
                                                            gpointer user_data);
@@ -57,13 +58,20 @@ class FRPipeline
                                                           GstPadProbeInfo *info,
                                                           gpointer user_data);
 
+        void adjust_for_fr_max_measure();
+
+        // Warm up
         static GstPadProbeReturn fr_warm_up_drop_probe_cb(GstPad *pad,
                                                           GstPadProbeInfo *info,
                                                           gpointer user_data);
 
+        // Source caps monitoring
         static GstPadProbeReturn src_caps_event_probe_cb(GstPad *pad,
                                                          GstPadProbeInfo *info,
                                                          gpointer user_data);
+
+        void handle_msg_reconfigure_fps(const GstStructure * s);
+
         struct TimeMeasurement {
             GstClockTime base;
             GstClockTime last;
