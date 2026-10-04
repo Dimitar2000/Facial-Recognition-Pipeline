@@ -73,6 +73,19 @@ static void gst_fr_metadata_visualizer_handle_metadata(cv::Mat& frame, FRMetadat
         return;
     }
 
+    if (metadata->detected_faces.empty())
+    {
+        cv::putText(frame,
+                    "No faces detected",
+                    cv::Point2d(0, frame.rows - 1),
+                    cv::FONT_HERSHEY_PLAIN,
+                    3,
+                    {255, 255, 0},
+                    2);
+        
+        return;
+    }
+
     for (const auto& face: metadata->detected_faces) 
     {
         std::vector<gchar *> metadata_lines;
