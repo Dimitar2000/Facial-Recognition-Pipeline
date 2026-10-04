@@ -94,4 +94,5 @@ class FRPipeline
         GstPipelineLM pipeline;
 
         ProbeData probe_data;
+        GstClockTime expected_max_fr_latency;
 };

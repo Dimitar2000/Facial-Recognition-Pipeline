@@ -102,22 +102,23 @@ void FRPipeline::attach_source_caps_event_probe()
 void FRPipeline::configure_skip_queues(double target_fps, 
                                        GstClockTime max_fr_latency)
 {
+    this->expected_max_fr_latency = max_fr_latency * FR_LATENCY_MARGIN_FACTOR;
+
     auto latency_pipeline_base  = 10 * GST_MSECOND;
     auto latency_queue_overhead = 1 * GST_MSECOND;
-    auto latency_fr_max = max_fr_latency * FR_LATENCY_MARGIN_FACTOR;
 
     std::cout << "[Pipeline] Calculating required skip queue size\n" 
               << "           Using: \n"
               << "              Target FPS                 : " << target_fps << "\n"
               << "              Latency of Base Pipeline   : " << latency_pipeline_base << "\n"
               << "              Latency of Queue           : " << latency_queue_overhead << "\n"
-              << "              Expected Max Latency of FR : " << latency_fr_max << "\n"
+              << "              Expected Max Latency of FR : " << expected_max_fr_latency << "\n"
               << std::endl;
 
     auto slots = config_calculator.compute_queue_slots(target_fps,
                                                        latency_pipeline_base,
                                                        latency_queue_overhead,
-                                                       latency_fr_max);
+                                                       expected_max_fr_latency);
 
     std::cout << "[Pipeline] Configuring skip queue with " << slots << " slots" << std::endl;
 
@@ -346,10 +347,30 @@ void FRPipeline::run()
 
     while (run)
     {
-        GstMessageLM msg(gst_bus_timed_pop_filtered(
-            bus.get(),
-            GST_CLOCK_TIME_NONE,
-            static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS | GST_MESSAGE_APPLICATION)));
+        GstMessage * m = gst_bus_timed_pop_filtered(bus.get(),
+                                                    GST_SECOND,
+                                                    static_cast<GstMessageType>(
+                                                        GST_MESSAGE_ERROR | 
+                                                        GST_MESSAGE_EOS | 
+                                                        GST_MESSAGE_APPLICATION));
+
+        // When no new message is received, check if the maximum detected latency has changed
+        if (!m)
+        {
+            std::cout << "[Pipeline] Checking current max measurement ... " << std::endl;
+
+            if (probe_data.fr_measurement.max > expected_max_fr_latency)
+            {
+                std::cout << "[Pipeline] Reconfiguring for new max FR latency ..." << std::endl;
+
+                configure_skip_queues(target_fps, probe_data.fr_measurement.max);
+            }
+
+            continue;
+        }
+
+        // Process a new message
+        GstMessageLM msg(m);
 
         switch (GST_MESSAGE_TYPE(msg.get()))
         {
