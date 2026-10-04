@@ -37,7 +37,8 @@ class FRPipeline
         FRPipeline(double target_fps,
                    std::string face_dataset_file_path,
                    std::string yunet_model_file_path,
-                   std::string sface_model_file_path);
+                   std::string sface_model_file_path,
+                   bool monitor_src_caps);
         
         virtual GstElementLM get_source() = 0;
 
@@ -99,10 +100,12 @@ class FRPipeline
 
         static const char * MSG_RECONFIGURE_FPS;
 
-        ConfigCalculator config_calculator;
-        double target_fps;
-        GstPipelineLM pipeline;
+        double           target_fps;
+        bool             monitor_src_fps;
 
-        ProbeData probe_data;
+        ConfigCalculator config_calculator;
+        GstPipelineLM    pipeline;
+
+        ProbeData    probe_data;
         GstClockTime expected_max_fr_latency;
 };

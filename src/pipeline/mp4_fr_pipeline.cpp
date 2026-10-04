@@ -9,11 +9,13 @@ MP4FRPipeline::MP4FRPipeline(double target_fps,
                              std::string face_dataset_file_path,
                              std::string yunet_model_file_path,
                              std::string sface_model_file_path,
-                             std::string input_mp4_file_path)
+                             std::string input_mp4_file_path,
+                             bool monitor_src_caps)
     : FRPipeline(target_fps,
                  face_dataset_file_path,
                  yunet_model_file_path,
-                 sface_model_file_path)
+                 sface_model_file_path,
+                 monitor_src_caps)
 {
     GstElementLM source(gst_element_factory_make("filesrc", "source"));
     GstElementLM decoder(gst_element_factory_make("decodebin", "decoder"));

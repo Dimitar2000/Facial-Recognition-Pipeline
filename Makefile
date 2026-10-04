@@ -4,6 +4,9 @@
 		run_mp4            \
 		clean
 
+emulate 		 ?= "no"
+monitor-src-caps ?= "no"
+
 YUNET 		 = models/face_detection_yunet_2026may.onnx
 SFACE 		 = models/face_recognition_sface_2021dec.onnx
 FACE_DATASET = dataset/
@@ -28,6 +31,7 @@ run_mp4: $(EMBEDDINGS)
 		mp4 					\
 		$(fps)					\
 		$(emulate)				\
+		$(monitor-src-caps)		\
 		$(EMBEDDINGS)  			\
 		$(YUNET) 				\
 		$(SFACE)				\
@@ -39,6 +43,7 @@ run_webcam: $(EMBEDDINGS)
 		webcam 					\
 		$(fps)					\
 		$(emulate)				\
+		$(monitor-src-caps)		\
 		$(EMBEDDINGS)  			\
 		$(YUNET) 				\
 		$(SFACE)

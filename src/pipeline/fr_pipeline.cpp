@@ -37,8 +37,10 @@ const char * FRPipeline::MSG_RECONFIGURE_FPS = "reconfigure-fps";
 FRPipeline::FRPipeline(double target_fps,
                        std::string face_dataset_file_path,
                        std::string yunet_model_file_path,
-                       std::string sface_model_file_path)
+                       std::string sface_model_file_path,
+                       bool monitor_src_caps)
     : target_fps(target_fps),
+      monitor_src_fps(monitor_src_caps),
       probe_data({{0, 0, 0}, 0})
 {
     pipeline = GstPipelineLM(gst_pipeline_new(EL_PIPELINE));
@@ -395,7 +397,10 @@ void FRPipeline::set_virtual_src_fps(double fps)
 
 void FRPipeline::run()
 {
-    attach_source_caps_event_probe();
+    if (monitor_src_fps)
+    {
+        attach_source_caps_event_probe();
+    }
     
     gst_element_set_state(pipeline.get(), GST_STATE_PLAYING);
 

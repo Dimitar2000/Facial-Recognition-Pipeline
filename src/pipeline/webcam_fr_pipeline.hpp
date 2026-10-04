@@ -11,7 +11,8 @@ class WebcamFRPipeline : public FRPipeline
         WebcamFRPipeline(double target_fps,
                          std::string face_dataset_file_path,
                          std::string yunet_model_file_path,
-                         std::string sface_model_file_path);
+                         std::string sface_model_file_path,
+                         bool monitor_src_caps);
 
         ~WebcamFRPipeline() override = default;
 

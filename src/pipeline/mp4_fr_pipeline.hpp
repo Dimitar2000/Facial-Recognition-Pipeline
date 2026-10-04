@@ -12,7 +12,8 @@ class MP4FRPipeline : public FRPipeline
                       std::string face_dataset_file_path,
                       std::string yunet_model_file_path,
                       std::string sface_model_file_path,
-                      std::string input_mp4_file_path);
+                      std::string input_mp4_file_path,
+                      bool monitor_src_caps);
 
         ~MP4FRPipeline() override = default;
 
