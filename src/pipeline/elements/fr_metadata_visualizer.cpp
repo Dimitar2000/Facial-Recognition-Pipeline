@@ -5,6 +5,7 @@
 #include <gst/video/video-info.h>
 
 #include <opencv2/imgproc.hpp>
+#include <string>
 
 #include "pipeline/metadata/fr_metadata.hpp"
 
@@ -12,6 +13,8 @@ typedef struct _FRMetadataVisualizer {
     GstElement element;
     GstPad *sinkpad;
     GstPad *srcpad;
+
+    int skip_counter;
 } FRMetadataVisualizer;
 
 G_DEFINE_TYPE(FRMetadataVisualizer, gst_fr_metadata_visualizer, GST_TYPE_ELEMENT);
@@ -56,14 +59,18 @@ static void gst_fr_metadata_visualizer_init(FRMetadataVisualizer *element)
     element->srcpad = gst_pad_new_from_template(
         gst_element_class_get_pad_template(klass, "src"), "src");
     gst_element_add_pad(GST_ELEMENT(element), element->srcpad);
+
+    element->skip_counter = 0;
 }
 
-static void gst_fr_metadata_visualizer_handle_metadata(cv::Mat& frame, FRMetadata *metadata)
+static void gst_fr_metadata_visualizer_handle_metadata(FRMetadataVisualizer& meta_visualizer, cv::Mat& frame, FRMetadata *metadata)
 {
     if (!metadata)
     {
+        meta_visualizer.skip_counter++;
+        
         cv::putText(frame,
-                    "Skipped",
+                    "Skipped " + std::to_string(meta_visualizer.skip_counter),
                     cv::Point2d(0, frame.rows - 1),
                     cv::FONT_HERSHEY_PLAIN,
                     3,
@@ -73,8 +80,11 @@ static void gst_fr_metadata_visualizer_handle_metadata(cv::Mat& frame, FRMetadat
         return;
     }
 
+    meta_visualizer.skip_counter = 0;
+
     if (metadata->detected_faces.empty())
     {
+
         cv::putText(frame,
                     "No faces detected",
                     cv::Point2d(0, frame.rows - 1),
@@ -185,7 +195,7 @@ GstFlowReturn gst_fr_metadata_visualizer_chain(GstPad *pad,
                       data, 
                       stride);
 
-        gst_fr_metadata_visualizer_handle_metadata(frame, metadata);
+        gst_fr_metadata_visualizer_handle_metadata(*element, frame, metadata);
 
         gst_video_frame_unmap(&frame_view);
     }
