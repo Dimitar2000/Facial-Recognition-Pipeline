@@ -48,13 +48,18 @@ FRPipeline::FRPipeline(double target_fps,
     GstElementLM fr_element(gst_element_factory_make("fr-element", EL_FR_ELEMENT));
     GstElementLM fr_meta_visualizer(gst_element_factory_make("fr-metadata-visualizer", EL_FR_META_VISUALIZER));
     GstElementLM video_convert2(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_TO_SINK));
-    GstElementLM sink(gst_element_factory_make("autovideosink", EL_SINK));
+    GstElementLM sink(gst_element_factory_make("fpsdisplaysink", EL_SINK));
 
     gst_fr_element_init_processor(GST_FR_ELEMENT(fr_element.get()),
                                   face_dataset_file_path,
                                   yunet_model_file_path,
                                   sface_model_file_path,
                                   1024);
+
+    g_object_set(G_OBJECT(sink.get()), 
+                 " video-sink", "autovideosink",
+                 "sync", "true", 
+                 nullptr);
 
     pipeline.add_to_pipeline(src_pl_endpoint);
     pipeline.add_to_pipeline(video_convert);
@@ -375,6 +380,8 @@ void FRPipeline::add_virtual_src_fps()
 
 void FRPipeline::set_virtual_src_fps(double fps)
 {
+    std::cout << "[Pipeline] Setting source FPS filter " << fps << std::endl;
+
     // Set required FPS for queue buffers downstream
     GstCapsLM caps(gst_caps_new_simple("video/x-raw",
                                     "framerate",

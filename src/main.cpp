@@ -131,34 +131,7 @@ int main(int argc, char *argv[])
     {
         pipeline->warm_up();
         pipeline->add_skip_queuing();
-        pipeline->add_virtual_src_fps();
-
-        auto t = std::thread([&pipeline] 
-        {
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-
-            pipeline->set_virtual_src_fps(25);
-
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-
-            pipeline->set_virtual_src_fps(15);
-
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-
-            pipeline->set_virtual_src_fps(10);
-
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-
-            pipeline->set_virtual_src_fps(5);
-
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-
-            pipeline->set_virtual_src_fps(25);
-        });
-
         pipeline->run();
-
-        t.join();
     }
     catch(std::runtime_error e)
     {
