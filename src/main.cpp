@@ -16,8 +16,8 @@
 #define DEBUG
 
 const std::string HELP_MESSAGE = "Not enough arguments. Format is: \n"
-                                 "  <app> webcam <fps> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path>\n"
-                                 "  <app> mp4    <fps> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path> <input-mp4-file-path>\n";
+                                 "  <app> webcam <fps> <emulate-src-fps-change?> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path>\n"
+                                 "  <app> mp4    <fps> <emulate-src-fps-change?> <input-face-embeddings-file-path> <face-detection-yunet-file-path> <face-recog-sface-file-path> <input-mp4-file-path>\n";
 
 int main(int argc, char *argv[])
 {
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
     }
     
     // Check and parse arguments
-    if (argc < 6)
+    if (argc < 7)
     {
         std::cerr << HELP_MESSAGE << std::endl;
         return 1;
@@ -49,10 +49,14 @@ int main(int argc, char *argv[])
     std::string source_type            = argv[1];
     std::string target_fps_s           = argv[2];
     double      target_fps;
-    std::string face_dataset_file_path = argv[3];
-    std::string yunet_model_file_path  = argv[4];
-    std::string sface_model_file_path  = argv[5];
+    std::string emulate_src_fps_chg_s  = argv[3];
+    bool emulate_src_fps_chg;
+    std::string face_dataset_file_path = argv[4];
+    std::string yunet_model_file_path  = argv[5];
+    std::string sface_model_file_path  = argv[6];
     std::string input_mp4_file_path;
+
+    emulate_src_fps_chg = emulate_src_fps_chg_s == "yes";
 
     try 
     {
@@ -78,14 +82,14 @@ int main(int argc, char *argv[])
 
     if (source_type == "mp4")
     {
-        if (argc < 7)
+        if (argc < 8)
         {
             std::cerr << HELP_MESSAGE << std::endl;
             return 1;
         }
         else
         {
-            input_mp4_file_path = argv[6];
+            input_mp4_file_path = argv[7];
         }
     }
     
@@ -131,7 +135,42 @@ int main(int argc, char *argv[])
     {
         pipeline->warm_up();
         pipeline->add_skip_queuing();
-        pipeline->run();
+
+        if (emulate_src_fps_chg)
+        {
+            pipeline->add_virtual_src_fps();
+
+            auto t = std::thread([&pipeline] 
+            {
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+
+                pipeline->set_virtual_src_fps(10);
+
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+
+                pipeline->set_virtual_src_fps(15);
+
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+
+                pipeline->set_virtual_src_fps(10);
+
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+
+                pipeline->set_virtual_src_fps(5);
+
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+
+                pipeline->set_virtual_src_fps(25);
+            });
+
+            pipeline->run();
+
+            t.join();
+        }
+        else
+        {
+            pipeline->run();
+        }
     }
     catch(std::runtime_error e)
     {

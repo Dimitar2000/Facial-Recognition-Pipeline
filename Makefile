@@ -27,6 +27,7 @@ run_mp4: $(EMBEDDINGS)
 	build/facial-recog-pipeline \
 		mp4 					\
 		$(fps)					\
+		$(emulate)				\
 		$(EMBEDDINGS)  			\
 		$(YUNET) 				\
 		$(SFACE)				\
@@ -37,6 +38,7 @@ run_webcam: $(EMBEDDINGS)
 	build/facial-recog-pipeline \
 		webcam 					\
 		$(fps)					\
+		$(emulate)				\
 		$(EMBEDDINGS)  			\
 		$(YUNET) 				\
 		$(SFACE)
