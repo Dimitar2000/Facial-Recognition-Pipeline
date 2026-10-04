@@ -19,6 +19,7 @@
 #include "gst_wrappers/gst_element_lm.hpp"
 
 const char * FRPipeline::EL_PIPELINE                  = "pipeline";
+const char * FRPipeline::EL_SRC_ENDPOINT              = "id_src_endpoint";
 const char * FRPipeline::EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";
 const char * FRPipeline::EL_FR_ELEMENT                = "facial_recognition_element";
 const char * FRPipeline::EL_FR_SKIP_QUEUE             = "fr_skip_queue";
@@ -39,6 +40,7 @@ FRPipeline::FRPipeline(double target_fps,
 {
     pipeline = GstPipelineLM(gst_pipeline_new(EL_PIPELINE));
 
+    GstElementLM src_pl_endpoint = gst_element_factory_make("identity", "src_pl_endpoint");
     GstElementLM video_convert(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_FROM_SOURCE));
     GstElementLM fr_element(gst_element_factory_make("fr-element", EL_FR_ELEMENT));
     GstElementLM fr_meta_visualizer(gst_element_factory_make("fr-metadata-visualizer", EL_FR_META_VISUALIZER));
@@ -51,12 +53,14 @@ FRPipeline::FRPipeline(double target_fps,
                                   sface_model_file_path,
                                   1024);
 
+    pipeline.add_to_pipeline(src_pl_endpoint);
     pipeline.add_to_pipeline(video_convert);
     pipeline.add_to_pipeline(fr_element);
     pipeline.add_to_pipeline(fr_meta_visualizer);
     pipeline.add_to_pipeline(video_convert2);
     pipeline.add_to_pipeline(sink);
 
+    pipeline.link_elements("src_pl_endpoint", EL_VIDEO_CONVERT_FROM_SOURCE);
     pipeline.link_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_FR_ELEMENT);
     pipeline.link_elements(EL_FR_ELEMENT, EL_FR_META_VISUALIZER);
     pipeline.link_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
@@ -88,8 +92,8 @@ void FRPipeline::attach_fr_measurement_probes()
 
 void FRPipeline::attach_source_caps_event_probe()
 {
-    GstElementLM source = get_source();
-    GstPadLM src_pad = gst_element_get_static_pad(source.get(), "src");
+    GstPadLM src_pad = gst_element_get_static_pad(pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE).get(), 
+                                                  "src");
 
     gst_pad_add_probe(src_pad.get(),
                       GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
@@ -344,6 +348,26 @@ void FRPipeline::add_skip_queuing()
     configure_skip_queues(target_fps, probe_data.fr_measurement.max     
                                                         ? probe_data.fr_measurement.max
                                                         : DEFAULT_FR_MAX_LATENCY);
+}
+
+void FRPipeline::add_virtual_src_fps()
+{
+    GstElementLM queue(gst_element_factory_make("queue", "virtual_src_fps_queue"));
+    GstElementLM videorate(gst_element_factory_make("videorate", "virtual_src_fps_framerate"));
+    GstElementLM capsfilter(gst_element_factory_make("capsfilter", "virtual_src_fps_caps"));
+
+    std::cout << "[Pipeline] Inserting queueing + framerate elements" << std::endl;
+
+    pipeline.unlink_elements("src_pl_endpoint", EL_VIDEO_CONVERT_FROM_SOURCE);
+
+    pipeline.add_to_pipeline(queue);
+    pipeline.add_to_pipeline(videorate);
+    pipeline.add_to_pipeline(capsfilter);
+
+    pipeline.link_elements("src_pl_endpoint", "virtual_src_fps_queue");
+    pipeline.link_elements("virtual_src_fps_queue", "virtual_src_fps_framerate");
+    pipeline.link_elements("virtual_src_fps_framerate", "virtual_src_fps_caps");
+    pipeline.link_elements("virtual_src_fps_caps", EL_VIDEO_CONVERT_FROM_SOURCE);
 }
 
 void FRPipeline::run()

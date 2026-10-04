@@ -29,7 +29,7 @@ WebcamFRPipeline::WebcamFRPipeline(double target_fps,
 
     pipeline.link_elements("source", "resolution");
     pipeline.link_elements("resolution", "jpeg_decoder");
-    pipeline.link_elements("jpeg_decoder", EL_VIDEO_CONVERT_FROM_SOURCE);
+    pipeline.link_elements("jpeg_decoder", EL_SRC_ENDPOINT);
 }
 
 GstElementLM WebcamFRPipeline::get_source()

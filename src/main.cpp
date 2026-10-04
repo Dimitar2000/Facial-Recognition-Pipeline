@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
         else if (source_type == "mp4")
         {
             std::cout << "Source type is: MP4 video file" << std::endl;
-               
+
             pipeline = std::make_unique<MP4FRPipeline>(target_fps,
                                                        face_dataset_file_path, 
                                                        yunet_model_file_path, 
@@ -129,6 +129,7 @@ int main(int argc, char *argv[])
     {
         pipeline->warm_up();
         pipeline->add_skip_queuing();
+        pipeline->add_virtual_src_fps();
         pipeline->run();
     }
     catch(std::runtime_error e)

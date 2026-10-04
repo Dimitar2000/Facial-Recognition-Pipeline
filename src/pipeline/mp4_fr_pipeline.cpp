@@ -25,7 +25,7 @@ MP4FRPipeline::MP4FRPipeline(double target_fps,
 
     pipeline.link_elements("source", "decoder");
 
-    GstElementLM video_convert = pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE);
+    GstElementLM video_convert = pipeline.get_by_name(EL_SRC_ENDPOINT);
 
     g_signal_connect(pipeline.get_by_name("decoder").get(),
                      "pad-added",

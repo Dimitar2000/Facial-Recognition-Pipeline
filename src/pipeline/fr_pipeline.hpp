@@ -23,6 +23,9 @@ class FRPipeline
         // Extend the pipeline with a post-FR queue and  
         void add_skip_queuing();
 
+        // Add control framerate at source to test FPS change behaviour
+        void add_virtual_src_fps();
+
         virtual ~FRPipeline() = default;
 
     protected:
@@ -78,6 +81,7 @@ class FRPipeline
         static const guint WARMUP_IGNORE_NO_MEASURE = WARMUP_FRAMES / 2;
 
         static const char * EL_PIPELINE;
+        static const char * EL_SRC_ENDPOINT;
         static const char * EL_VIDEO_CONVERT_FROM_SOURCE;
         static const char * EL_FR_ELEMENT;
         static const char * EL_FR_SKIP_QUEUE;
