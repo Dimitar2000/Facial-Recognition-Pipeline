@@ -89,7 +89,7 @@ class FRPipeline
         static constexpr double FR_LATENCY_MARGIN_FACTOR = 1.3;
         
         // Used by the warm up procedure
-        static const guint WARMUP_FRAMES            = 30;
+        static const guint WARMUP_FRAMES            = 10;
         static const guint WARMUP_IGNORE_NO_MEASURE = WARMUP_FRAMES / 2;
 
         static const char * EL_PIPELINE;
