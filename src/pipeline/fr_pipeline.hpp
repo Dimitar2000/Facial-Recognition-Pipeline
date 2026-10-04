@@ -26,6 +26,9 @@ class FRPipeline
         // Add control framerate at source to test FPS change behaviour
         void add_virtual_src_fps();
 
+        // Set the virtual src fps to trigger a caps renegotiation downstream
+        void set_virtual_src_fps(double fps);
+
         virtual ~FRPipeline() = default;
 
     protected:
@@ -82,6 +85,9 @@ class FRPipeline
 
         static const char * EL_PIPELINE;
         static const char * EL_SRC_ENDPOINT;
+        static const char * EL_VIRT_SRC_FPS_QUEUE;
+        static const char * EL_VIRT_SRC_FPS_FRAMERATE;
+        static const char * EL_VIRT_SRC_FPS_FILTER;
         static const char * EL_VIDEO_CONVERT_FROM_SOURCE;
         static const char * EL_FR_ELEMENT;
         static const char * EL_FR_SKIP_QUEUE;

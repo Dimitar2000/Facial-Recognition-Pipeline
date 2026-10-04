@@ -19,7 +19,10 @@
 #include "gst_wrappers/gst_element_lm.hpp"
 
 const char * FRPipeline::EL_PIPELINE                  = "pipeline";
-const char * FRPipeline::EL_SRC_ENDPOINT              = "id_src_endpoint";
+const char * FRPipeline::EL_SRC_ENDPOINT              = "src_pl_endpoint";
+const char * FRPipeline::EL_VIRT_SRC_FPS_QUEUE        = "virt-src-fps-queue";
+const char * FRPipeline::EL_VIRT_SRC_FPS_FRAMERATE    = "virt-src-fps-framerate";
+const char * FRPipeline::EL_VIRT_SRC_FPS_FILTER       = "virt-src-fps-capsfilter";
 const char * FRPipeline::EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";
 const char * FRPipeline::EL_FR_ELEMENT                = "facial_recognition_element";
 const char * FRPipeline::EL_FR_SKIP_QUEUE             = "fr_skip_queue";
@@ -40,7 +43,7 @@ FRPipeline::FRPipeline(double target_fps,
 {
     pipeline = GstPipelineLM(gst_pipeline_new(EL_PIPELINE));
 
-    GstElementLM src_pl_endpoint = gst_element_factory_make("identity", "src_pl_endpoint");
+    GstElementLM src_pl_endpoint = gst_element_factory_make("identity", EL_SRC_ENDPOINT);
     GstElementLM video_convert(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_FROM_SOURCE));
     GstElementLM fr_element(gst_element_factory_make("fr-element", EL_FR_ELEMENT));
     GstElementLM fr_meta_visualizer(gst_element_factory_make("fr-metadata-visualizer", EL_FR_META_VISUALIZER));
@@ -60,7 +63,7 @@ FRPipeline::FRPipeline(double target_fps,
     pipeline.add_to_pipeline(video_convert2);
     pipeline.add_to_pipeline(sink);
 
-    pipeline.link_elements("src_pl_endpoint", EL_VIDEO_CONVERT_FROM_SOURCE);
+    pipeline.link_elements(EL_SRC_ENDPOINT, EL_VIDEO_CONVERT_FROM_SOURCE);
     pipeline.link_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_FR_ELEMENT);
     pipeline.link_elements(EL_FR_ELEMENT, EL_FR_META_VISUALIZER);
     pipeline.link_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
@@ -352,22 +355,35 @@ void FRPipeline::add_skip_queuing()
 
 void FRPipeline::add_virtual_src_fps()
 {
-    GstElementLM queue(gst_element_factory_make("queue", "virtual_src_fps_queue"));
-    GstElementLM videorate(gst_element_factory_make("videorate", "virtual_src_fps_framerate"));
-    GstElementLM capsfilter(gst_element_factory_make("capsfilter", "virtual_src_fps_caps"));
+    GstElementLM queue(gst_element_factory_make("queue", EL_VIRT_SRC_FPS_QUEUE));
+    GstElementLM videorate(gst_element_factory_make("videorate", EL_VIRT_SRC_FPS_FRAMERATE));
+    GstElementLM capsfilter(gst_element_factory_make("capsfilter", EL_VIRT_SRC_FPS_FILTER));
 
     std::cout << "[Pipeline] Inserting queueing + framerate elements" << std::endl;
 
-    pipeline.unlink_elements("src_pl_endpoint", EL_VIDEO_CONVERT_FROM_SOURCE);
+    pipeline.unlink_elements(EL_SRC_ENDPOINT, EL_VIDEO_CONVERT_FROM_SOURCE);
 
     pipeline.add_to_pipeline(queue);
     pipeline.add_to_pipeline(videorate);
     pipeline.add_to_pipeline(capsfilter);
 
-    pipeline.link_elements("src_pl_endpoint", "virtual_src_fps_queue");
-    pipeline.link_elements("virtual_src_fps_queue", "virtual_src_fps_framerate");
-    pipeline.link_elements("virtual_src_fps_framerate", "virtual_src_fps_caps");
-    pipeline.link_elements("virtual_src_fps_caps", EL_VIDEO_CONVERT_FROM_SOURCE);
+    pipeline.link_elements(EL_SRC_ENDPOINT, EL_VIRT_SRC_FPS_QUEUE);
+    pipeline.link_elements(EL_VIRT_SRC_FPS_QUEUE, EL_VIRT_SRC_FPS_FRAMERATE);
+    pipeline.link_elements(EL_VIRT_SRC_FPS_FRAMERATE, EL_VIRT_SRC_FPS_FILTER);
+    pipeline.link_elements(EL_VIRT_SRC_FPS_FILTER, EL_VIDEO_CONVERT_FROM_SOURCE);
+}
+
+void FRPipeline::set_virtual_src_fps(double fps)
+{
+    // Set required FPS for queue buffers downstream
+    GstCapsLM caps(gst_caps_new_simple("video/x-raw",
+                                    "framerate",
+                                    GST_TYPE_FRACTION,
+                                    static_cast<guint>(fps * 100),
+                                    100,
+                                    nullptr));
+ 
+    g_object_set(pipeline.get_by_name(EL_VIRT_SRC_FPS_FILTER).get(), "caps", caps.get(), nullptr);
 }
 
 void FRPipeline::run()
