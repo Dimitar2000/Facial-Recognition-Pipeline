@@ -44,10 +44,24 @@ G_DEFINE_TYPE(GstBurstQueue, gst_burst_queue, GST_TYPE_ELEMENT)
 enum
 {
     PROP_0,
-    PROP_BUFFER_COUNT,
-    PROP_FPS,
+    PROP_CONFIG
 };
 
+/*
+ * Registers MyConfig as a GBoxed type.
+ *
+ * This creates:
+ *
+ *     my_config_get_type()
+ *
+ * which returns the GType.
+ */
+G_DEFINE_BOXED_TYPE(
+    Config,
+    my_config,
+    my_config_copy,
+    my_config_free
+);
 
 static void
 gst_burst_queue_set_property(GObject      *object,
@@ -60,15 +74,10 @@ gst_burst_queue_set_property(GObject      *object,
     GST_OBJECT_LOCK(self);
 
     switch (prop_id) {
-    case PROP_BUFFER_COUNT:
-        std::cout << "[burstqueue] setting buffer count " << self->buffer_count << std::endl;
-        self->buffer_count = g_value_get_uint(value);
-        gst_burst_queue_recalculate(self);
-        break;
-
-    case PROP_FPS:
-        std::cout << "[burstqueue] setting fps " << self->fps << std::endl;
-        self->fps = g_value_get_double(value);
+    case PROP_CONFIG:
+        self->config = *(Config *) g_value_get_boxed(value);
+        std::cout << "[burstqueue] setting buffer count " << self->config.buffer_count << std::endl;
+        std::cout << "[burstqueue] setting fps " << self->config.fps << std::endl;
         gst_burst_queue_recalculate(self);
         break;
 
@@ -92,12 +101,8 @@ gst_burst_queue_get_property(GObject    *object,
     GST_OBJECT_LOCK(self);
 
     switch (prop_id) {
-    case PROP_BUFFER_COUNT:
-        g_value_set_uint(value, self->buffer_count);
-        break;
-
-    case PROP_FPS:
-        g_value_set_double(value, self->fps);
+    case PROP_CONFIG:
+        g_value_set_boxed(value, (gconstpointer *)&self->config);
         break;
 
     default:
@@ -116,12 +121,12 @@ gst_burst_queue_get_property(GObject    *object,
 static void
 gst_burst_queue_recalculate(GstBurstQueue *self)
 {
-    if (self->fps == 0) {
+    if (self->config.fps == 0) {
         self->frame_duration = GST_CLOCK_TIME_NONE;
         return;
     }
 
-    self->frame_duration = GST_SECOND / self->fps;
+    self->frame_duration = GST_SECOND / self->config.fps;
 
     /*
      * Delay introduced by prefill.
@@ -134,9 +139,9 @@ gst_burst_queue_recalculate(GstBurstQueue *self)
      * If you deliberately wait one more frame period before releasing
      * the first frame, change this to buffer_count * frame_duration.
      */
-    if (self->buffer_count > 0) {
+    if (self->config.buffer_count > 0) {
         self->timestamp_offset =
-            self->buffer_count * self->frame_duration;
+            self->config.buffer_count * self->frame_duration;
     } else {
         self->timestamp_offset = 0;
     }
@@ -187,7 +192,7 @@ gst_burst_queue_output_task(gpointer user_data)
          * Wait for signal that new burst can be done
          */
         while((self->eos && !g_queue_is_empty(self->queue)) ||
-               g_queue_get_length(self->queue) < self->buffer_count)
+               g_queue_get_length(self->queue) < self->config.buffer_count)
         {
             g_cond_wait(&self->cond, &self->lock);
         }
@@ -201,7 +206,7 @@ gst_burst_queue_output_task(gpointer user_data)
         int pushed = 0;
 
         while((self->eos && !g_queue_is_empty(self->queue)) ||
-               pushed < self->buffer_count)
+               pushed < self->config.buffer_count)
         {
             std::cout << "[burstqueue] pushing " << pushed << std::endl;
 
@@ -226,6 +231,8 @@ gst_burst_queue_output_task(gpointer user_data)
             */
             if (buffer != NULL)
             {
+                std::cout << "[burstqueue] pushing ... " << pushed << std::endl;
+
                 GstFlowReturn ret =
                     gst_pad_push(self->srcpad, buffer);
 
@@ -433,26 +440,12 @@ gst_burst_queue_class_init(GstBurstQueueClass *klass)
 
     g_object_class_install_property(
         object_class,
-        PROP_BUFFER_COUNT,
-        g_param_spec_uint(
-            "buffer-count",
-            "Buffer count",
-            "Number of buffers required before output starts",
-            1,
-            G_MAXUINT,
-            1,
-            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
-
-    g_object_class_install_property(
-        object_class,
-        PROP_FPS,
-        g_param_spec_double(
-            "fps",
-            "FPS",
-            "Output FPS",
-            1,
-            60,
-            30,
+        PROP_CONFIG,
+        g_param_spec_boxed(
+            "config",
+            "Config",
+            "Element configuration",
+            MY_TYPE_CONFIG,
             static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
     gst_element_class_set_static_metadata(
@@ -496,8 +489,8 @@ gst_burst_queue_class_init(GstBurstQueueClass *klass)
 static void
 gst_burst_queue_init(GstBurstQueue *self)
 {
-    self->buffer_count = 1;
-    self->fps = 20.0f;
+    self->config.buffer_count = 1;
+    self->config.fps = 20.0f;
 
     self->queue = g_queue_new();
 
@@ -507,7 +500,7 @@ gst_burst_queue_init(GstBurstQueue *self)
 
     gst_segment_init(&self->segment, GST_FORMAT_TIME);
 
-    self->flushing = FALSE;
+    self->restart = FALSE;
     self->eos = FALSE;
     self->started = FALSE;
     self->have_segment = FALSE;

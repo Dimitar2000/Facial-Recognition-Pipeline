@@ -1,5 +1,6 @@
 #pragma once
 
+#include <glib-object.h>
 #include <glib.h>
 #include <gst/gst.h>
 
@@ -16,6 +17,43 @@ G_DECLARE_FINAL_TYPE(
 );
 
 G_END_DECLS
+
+typedef struct _Config {
+    /**
+     * Number of buffers required before the first burst starts.
+     */
+    guint buffer_count;
+
+    /**
+    * FPS numerator.
+    *
+    * Example: 30/1 for 30 FPS.
+    */
+    gdouble fps;
+} Config;
+
+
+/* Copy function */
+static Config *
+my_config_copy(const Config *config)
+{
+    Config *copy = g_new(Config, 1);
+    *copy = *config;
+    return copy;
+}
+
+
+/* Free function */
+static void
+my_config_free(Config *config)
+{
+    g_free(config);
+}
+
+
+/* Convenient macro */
+#define MY_TYPE_CONFIG (my_config_get_type())
+
 
 
 /**
@@ -96,18 +134,7 @@ struct _GstBurstQueue
      * Configuration
      * ------------------------------------------------------------------ */
 
-    /**
-     * Number of buffers required before the first burst starts.
-     */
-    guint buffer_count;
-
-    /**
-     * FPS numerator.
-     *
-     * Example: 30/1 for 30 FPS.
-     */
-    gdouble fps;
-
+    Config config;
 
     /* ---------------------------------------------------------------------
      * Timestamp configuration
@@ -205,7 +232,7 @@ struct _GstBurstQueue
     /**
      * TRUE after FLUSH_START and until FLUSH_STOP.
      */
-    gboolean flushing;
+    gboolean restart;
 
     /**
      * TRUE after receiving EOS.

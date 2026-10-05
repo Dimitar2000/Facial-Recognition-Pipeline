@@ -18,6 +18,7 @@
 
 #include "elements/fr_element.hpp"
 #include "gst_wrappers/gst_element_lm.hpp"
+#include "pipeline/elements/burstqueue.hpp"
 
 const char * FRPipeline::EL_PIPELINE                  = "pipeline";
 const char * FRPipeline::EL_SRC_ENDPOINT              = "src_pl_endpoint";
@@ -158,10 +159,10 @@ void FRPipeline::configure_skip_queues(double target_fps,
                                        static_cast<guint>(target_fps * 100),
                                        100,
                                        nullptr));
+    Config config = {slots, target_fps};
 
     gst_fr_element_set_skips(GST_FR_ELEMENT(element.get()), slots - 1);
-    g_object_set(G_OBJECT(burstqueue.get()), "fps", target_fps, nullptr);
-    g_object_set(G_OBJECT(burstqueue.get()), "buffer-count", slots, nullptr);
+    g_object_set(G_OBJECT(burstqueue.get()), "config", &config, nullptr);
     g_object_set(G_OBJECT(const_fps_filter.get()), "caps", caps.get(), nullptr);
     g_object_set(G_OBJECT(framerate_filter.get()), "caps", caps.get(), nullptr);
 
