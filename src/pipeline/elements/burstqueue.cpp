@@ -145,6 +145,10 @@ gst_burst_queue_recalculate(GstBurstQueue *self)
     } else {
         self->timestamp_offset = 0;
     }
+
+    std::cout << "[burstqueue] Flushing queue ..." << std::endl;
+    g_queue_clear(self->queue);
+    self->restart = TRUE;
 }
 
 
@@ -191,8 +195,9 @@ gst_burst_queue_output_task(gpointer user_data)
         /*
          * Wait for signal that new burst can be done
          */
-        while((self->eos && !g_queue_is_empty(self->queue)) ||
-               g_queue_get_length(self->queue) < self->config.buffer_count)
+        while(!self->restart 
+              &&  ((self->eos && !g_queue_is_empty(self->queue)) 
+                    || g_queue_get_length(self->queue) < self->config.buffer_count))
         {
             g_cond_wait(&self->cond, &self->lock);
         }
@@ -205,13 +210,12 @@ gst_burst_queue_output_task(gpointer user_data)
 
         int pushed = 0;
 
-        while((self->eos && !g_queue_is_empty(self->queue)) ||
-               pushed < self->config.buffer_count)
+        while(!self->restart
+                && (self->eos && !g_queue_is_empty(self->queue)) 
+                    || pushed < self->config.buffer_count)
         {
-            std::cout << "[burstqueue] pushing " << pushed << std::endl;
-
             g_mutex_lock(&self->lock);
-    
+
             /*
             * Take exactly one buffer.
             *
@@ -248,6 +252,7 @@ gst_burst_queue_output_task(gpointer user_data)
             }
             else
             {
+                std::cout << "[burstqueue] NULL buffer " << pushed << std::endl;
                 break;
             }
 
@@ -267,6 +272,16 @@ gst_burst_queue_output_task(gpointer user_data)
              */
             pushed++;
         }
+
+        g_mutex_lock(&self->lock);
+        
+        if (self->restart)
+        {
+            self->restart = FALSE;
+            std::cout << "Restart completed" << std::endl;
+        }
+
+        g_mutex_unlock(&self->lock);
     }
 }
 
@@ -285,6 +300,12 @@ gst_burst_queue_chain(GstPad    *pad,
     std::cout << "[burstqueue] queueing " << std::endl;
 
     g_mutex_lock(&self->lock);
+    
+    while (g_queue_get_length(self->queue) >= 2 * self->config.buffer_count) {
+        g_mutex_unlock(&self->lock);  
+        // ...    
+        g_mutex_lock(&self->lock);
+    }
 
     /*
     * Adjust timestamps before putting in the queue.
