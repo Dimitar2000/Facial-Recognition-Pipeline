@@ -6,6 +6,7 @@
 
 emulate 		 ?= "no"
 monitor-src-caps ?= "no"
+fps ?= 25
 
 YUNET 		 = models/face_detection_yunet_2026may.onnx
 SFACE 		 = models/face_recognition_sface_2021dec.onnx
