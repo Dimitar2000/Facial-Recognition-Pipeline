@@ -462,7 +462,12 @@ gst_burst_queue_class_init(GstBurstQueueClass *klass)
         "Prefill and clock-paced buffer queue",
         "Example");
 
-    GstCaps *caps = gst_caps_new_any();
+    GstCaps *caps = gst_caps_from_string(
+        "video/x-raw,"
+        "format=(string)RGB,"
+        "width=(int)[1,MAX],"
+        "height=(int)[1,MAX],"
+        "framerate=(fraction)[0/1,MAX]");
 
     gst_element_class_add_pad_template(
         element_class,
