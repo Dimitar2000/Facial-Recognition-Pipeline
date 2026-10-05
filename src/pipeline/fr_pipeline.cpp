@@ -55,7 +55,7 @@ FRPipeline::FRPipeline(double target_fps,
     GstElementLM fr_element(gst_element_factory_make("fr-element", EL_FR_ELEMENT));
     GstElementLM fr_meta_visualizer(gst_element_factory_make("fr-metadata-visualizer", EL_FR_META_VISUALIZER));
     GstElementLM video_convert2(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_TO_SINK));
-    GstElementLM sink(gst_element_factory_make("autovideosink", EL_SINK));
+    GstElementLM sink(gst_element_factory_make("fpsdisplaysink", EL_SINK));
 
     gst_fr_element_init_processor(GST_FR_ELEMENT(fr_element.get()),
                                   face_dataset_file_path,
@@ -63,10 +63,10 @@ FRPipeline::FRPipeline(double target_fps,
                                   sface_model_file_path,
                                   1024);
 
-    // g_object_set(G_OBJECT(sink.get()), 
-    //              " video-sink", "autovideosink",
-    //              "sync", "true", 
-    //              nullptr);
+    g_object_set(G_OBJECT(sink.get()), 
+                 " video-sink", "autovideosink",
+                 "sync", "true", 
+                 nullptr);
 
     pipeline.add_to_pipeline(src_pl_endpoint);
     pipeline.add_to_pipeline(video_convert);
@@ -492,6 +492,7 @@ void FRPipeline::run()
             if (gst_structure_has_name(s, FRPipeline::MSG_RECONFIGURE_FPS)) 
             {
                 handle_msg_reconfigure_fps(s);
+                break;
             }
             
             throw std::runtime_error("Unknown application message structure!");
