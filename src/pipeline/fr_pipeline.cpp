@@ -1,6 +1,7 @@
 #include "fr_pipeline.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <glib-object.h>
 #include <glib.h>
@@ -24,6 +25,10 @@ const char * FRPipeline::EL_VIRT_SRC_FPS_QUEUE        = "virt-src-fps-queue";
 const char * FRPipeline::EL_VIRT_SRC_FPS_FRAMERATE    = "virt-src-fps-framerate";
 const char * FRPipeline::EL_VIRT_SRC_FPS_FILTER       = "virt-src-fps-capsfilter";
 const char * FRPipeline::EL_VIDEO_CONVERT_FROM_SOURCE = "video_convert_from_source";
+const char * FRPipeline::EL_Q_CONST_FPS               = "q_const_fps";
+const char * FRPipeline::EL_V_CONST_FPS               = "v_const_fps";
+const char * FRPipeline::EL_F_CONST_FPS               = "f_const_fps";
+const char * FRPipeline::EL_BURSTQUEUE                = "burstqueue";
 const char * FRPipeline::EL_FR_ELEMENT                = "facial_recognition_element";
 const char * FRPipeline::EL_FR_SKIP_QUEUE             = "fr_skip_queue";
 const char * FRPipeline::EL_FRAMERATE                 = "framerate";
@@ -50,7 +55,7 @@ FRPipeline::FRPipeline(double target_fps,
     GstElementLM fr_element(gst_element_factory_make("fr-element", EL_FR_ELEMENT));
     GstElementLM fr_meta_visualizer(gst_element_factory_make("fr-metadata-visualizer", EL_FR_META_VISUALIZER));
     GstElementLM video_convert2(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_TO_SINK));
-    GstElementLM sink(gst_element_factory_make("fpsdisplaysink", EL_SINK));
+    GstElementLM sink(gst_element_factory_make("autovideosink", EL_SINK));
 
     gst_fr_element_init_processor(GST_FR_ELEMENT(fr_element.get()),
                                   face_dataset_file_path,
@@ -58,10 +63,10 @@ FRPipeline::FRPipeline(double target_fps,
                                   sface_model_file_path,
                                   1024);
 
-    g_object_set(G_OBJECT(sink.get()), 
-                 " video-sink", "autovideosink",
-                 "sync", "true", 
-                 nullptr);
+    // g_object_set(G_OBJECT(sink.get()), 
+    //              " video-sink", "autovideosink",
+    //              "sync", "true", 
+    //              nullptr);
 
     pipeline.add_to_pipeline(src_pl_endpoint);
     pipeline.add_to_pipeline(video_convert);
@@ -129,30 +134,22 @@ void FRPipeline::configure_skip_queues(double target_fps,
               << "              Expected Max Latency of FR : " << expected_max_fr_latency << "\n"
               << std::endl;
 
-    auto slots = config_calculator.compute_queue_slots(target_fps,
-                                                       latency_pipeline_base,
-                                                       latency_queue_overhead,
-                                                       expected_max_fr_latency);
+    // auto slots = config_calculator.compute_queue_slots(target_fps,
+    //                                                    latency_pipeline_base,
+    //                                                    latency_queue_overhead,
+    //                                                    expected_max_fr_latency);
+
+    guint slots = ceil(expected_max_fr_latency / (GST_SECOND / target_fps));
 
     std::cout << "[Pipeline] Configuring skip queue with " << slots << " slots" << std::endl;
 
-    GstElementLM queue            = pipeline.get_by_name(EL_FR_SKIP_QUEUE);
+    GstElementLM queue_const_fps = pipeline.get_by_name(EL_Q_CONST_FPS);
+    GstElementLM queue = pipeline.get_by_name(EL_FR_SKIP_QUEUE);
+
+    GstElementLM const_fps_filter = pipeline.get_by_name(EL_F_CONST_FPS);
+    GstElementLM burstqueue       = pipeline.get_by_name(EL_BURSTQUEUE);
     GstElementLM framerate_filter = pipeline.get_by_name(EL_FRAMERATE_FILTER);
     GstElementLM element          = pipeline.get_by_name(EL_FR_ELEMENT);
-
-    // Set queue size
-    g_object_set(queue.get(),
-                 "max-size-buffers", slots,
-                 "max-size-bytes", 0,
-                 "max-size-time", 0,
-                 nullptr);
-
-    // Set FR skips
-    std::cout << "[Pipeline] Configuring FR element to skip " << slots - 1 << " frames" << std::endl;
-
-    gst_fr_element_set_skips(GST_FR_ELEMENT(element.get()), slots - 1);
-
-    std::cout << "[Pipeline] Configuring framerate pair with FPS = " << target_fps << std::endl;
 
     // Set required FPS for queue buffers downstream
     GstCapsLM caps(gst_caps_new_simple("video/x-raw",
@@ -162,7 +159,11 @@ void FRPipeline::configure_skip_queues(double target_fps,
                                        100,
                                        nullptr));
 
-    g_object_set(framerate_filter.get(), "caps", caps.get(), nullptr);
+    gst_fr_element_set_skips(GST_FR_ELEMENT(element.get()), slots - 1);
+    g_object_set(G_OBJECT(burstqueue.get()), "fps", target_fps, nullptr);
+    g_object_set(G_OBJECT(burstqueue.get()), "buffer-count", slots, nullptr);
+    g_object_set(G_OBJECT(const_fps_filter.get()), "caps", caps.get(), nullptr);
+    g_object_set(G_OBJECT(framerate_filter.get()), "caps", caps.get(), nullptr);
 
 }
 
@@ -362,18 +363,47 @@ void FRPipeline::warm_up()
 
 void FRPipeline::add_skip_queuing()
 {
+    GstElementLM queue_const_fps(gst_element_factory_make("queue", EL_Q_CONST_FPS));
+    GstElementLM videorate_const_fps(gst_element_factory_make("videorate", EL_V_CONST_FPS));
+    GstElementLM capsfilter_const_fps(gst_element_factory_make("capsfilter", EL_F_CONST_FPS));
+    GstElementLM burstqueue(gst_element_factory_make("burstqueue", EL_BURSTQUEUE));
+
     GstElementLM queue(gst_element_factory_make("queue", EL_FR_SKIP_QUEUE));
     GstElementLM videorate(gst_element_factory_make("videorate", EL_FRAMERATE));
     GstElementLM capsfilter(gst_element_factory_make("capsfilter", EL_FRAMERATE_FILTER));
 
     std::cout << "[Pipeline] Inserting queueing + framerate elements" << std::endl;
 
-    pipeline.unlink_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
+            // Set queue size
+    g_object_set(G_OBJECT(queue_const_fps.get()),
+                 "max-size-buffers", 0,
+                 "max-size-bytes", 0,
+                 "max-size-time", GST_SECOND,
+                 nullptr);
+
+    g_object_set(G_OBJECT(queue.get()),
+                 "max-size-buffers", 0,
+                 "max-size-bytes", 0,
+                 "max-size-time", GST_SECOND,
+                 nullptr);
+
+    pipeline.add_to_pipeline(queue_const_fps);
+    pipeline.add_to_pipeline(videorate_const_fps);
+    pipeline.add_to_pipeline(capsfilter_const_fps);
+    pipeline.add_to_pipeline(burstqueue);
+
+    pipeline.unlink_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_FR_ELEMENT);
+    pipeline.link_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_Q_CONST_FPS);
+    pipeline.link_elements(EL_Q_CONST_FPS, EL_V_CONST_FPS);
+    pipeline.link_elements(EL_V_CONST_FPS, EL_F_CONST_FPS);
+    pipeline.link_elements(EL_F_CONST_FPS, EL_BURSTQUEUE);
+    pipeline.link_elements(EL_BURSTQUEUE, EL_FR_ELEMENT);
 
     pipeline.add_to_pipeline(queue);
     pipeline.add_to_pipeline(videorate);
     pipeline.add_to_pipeline(capsfilter);
 
+    pipeline.unlink_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
     pipeline.link_elements(EL_FR_META_VISUALIZER, EL_FR_SKIP_QUEUE);
     pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);
     pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
@@ -416,7 +446,7 @@ void FRPipeline::set_virtual_src_fps(double fps)
                                     100,
                                     nullptr));
  
-    g_object_set(pipeline.get_by_name(EL_VIRT_SRC_FPS_FILTER).get(), "caps", caps.get(), nullptr);
+    g_object_set(G_OBJECT(pipeline.get_by_name(EL_VIRT_SRC_FPS_FILTER).get()), "caps", caps.get(), nullptr);
 }
 
 void FRPipeline::run()

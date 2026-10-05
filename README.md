@@ -174,7 +174,7 @@ The configuration can be done anew while the pipeline is running if one of the f
 
 ### Directory Structure
 * `src/fr` - contains actual FR frame processing logic - currently only CPU
-* `src/gst_wrappers` - helper wrappers for lifetime management of GStreamer objects/elements references. Main goal is to call `unref` automatically when the wrapper object goes out of scope if an exception is throws. 
+* `src/gst_wrappers` - helper wrappers for lifetime management of GStreamer objects/elements references. Main goal is to call `unref` automatically when the wrapper object goes out of scope if an exception is throws.
 * `src/util` - auxiliary logic - file reading, time measurements for debugging
 * `src/pipeline` - contains the pipeline-related logic
     * main directory - pipeline architectures + (re-)configuration logic

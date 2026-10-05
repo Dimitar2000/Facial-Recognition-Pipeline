@@ -98,6 +98,10 @@ class FRPipeline
         static const char * EL_VIRT_SRC_FPS_FRAMERATE;
         static const char * EL_VIRT_SRC_FPS_FILTER;
         static const char * EL_VIDEO_CONVERT_FROM_SOURCE;
+        static const char * EL_Q_CONST_FPS;
+        static const char * EL_V_CONST_FPS;
+        static const char * EL_F_CONST_FPS;
+        static const char * EL_BURSTQUEUE;
         static const char * EL_FR_ELEMENT;
         static const char * EL_FR_SKIP_QUEUE;
         static const char * EL_FRAMERATE;
