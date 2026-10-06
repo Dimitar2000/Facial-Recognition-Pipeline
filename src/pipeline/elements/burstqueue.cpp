@@ -31,7 +31,6 @@
 #include <iostream>
 
 #include "burstqueue.hpp"
-#include "pipeline/metadata/fr_metadata.hpp"
 
 #define GST_TYPE_BURST_QUEUE (gst_burst_queue_get_type())
 
@@ -145,8 +144,7 @@ gst_burst_queue_recalculate(GstBurstQueue *self)
      * the first frame, change this to buffer_count * frame_duration.
      */
     if (self->config.buffer_count > 0) {
-        self->timestamp_offset =
-            (self->config.buffer_count - 1) * self->frame_duration;
+        self->timestamp_offset = (self->config.buffer_count - 1) * self->frame_duration;
     } else {
         self->timestamp_offset = 0;
     }
@@ -241,8 +239,6 @@ gst_burst_queue_output_task(gpointer user_data)
             */
             if (buffer != NULL)
             {
-                std::cout << "[burstqueue] Pushing  " << pushed << ": " << GST_BUFFER_PTS(buffer) << std::endl;
-
                 // Skip all but last buffer
                 bool skip = pushed < buffer_count - 1;
 
@@ -250,12 +246,12 @@ gst_burst_queue_output_task(gpointer user_data)
                 
                 if (skip)
                 {
-                    std::cout << "[burstqueue] Bypassing FR" << std::endl;
+                    std::cout << "[burstqueue] Buffer " << pushed << " -> skip FR" << std::endl;
                     ret = gst_pad_push(self->srcpad_fr_bypass, buffer);
                 }
                 else
                 {
-                    std::cout << "[burstqueue] Pushing to FR" << std::endl;
+                    std::cout << "[burstqueue] Buffer " << pushed << " -> FR" << std::endl;
                     ret = gst_pad_push(self->srcpad_fr, buffer);
                 }
 
@@ -318,8 +314,6 @@ gst_burst_queue_chain(GstPad    *pad,
                       GstBuffer *buffer)
 {
     GstBurstQueue *self = GST_BURST_QUEUE(parent);
-
-    std::cout << "[burstqueue] queueing " << std::endl;
 
     g_mutex_lock(&self->lock);
     
