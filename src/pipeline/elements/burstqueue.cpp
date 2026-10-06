@@ -73,6 +73,8 @@ gst_burst_queue_set_property(GObject      *object,
 
     GST_OBJECT_LOCK(self);
 
+    g_mutex_lock(&self->lock);
+
     switch (prop_id) {
     case PROP_CONFIG:
         self->config = *(Config *) g_value_get_boxed(value);
@@ -85,6 +87,8 @@ gst_burst_queue_set_property(GObject      *object,
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
         break;
     }
+
+    g_mutex_unlock(&self->lock);
 
     GST_OBJECT_UNLOCK(self);
 }
@@ -141,7 +145,7 @@ gst_burst_queue_recalculate(GstBurstQueue *self)
      */
     if (self->config.buffer_count > 0) {
         self->timestamp_offset =
-            self->config.buffer_count * self->frame_duration;
+            (self->config.buffer_count - 1) * self->frame_duration;
     } else {
         self->timestamp_offset = 0;
     }
@@ -235,7 +239,7 @@ gst_burst_queue_output_task(gpointer user_data)
             */
             if (buffer != NULL)
             {
-                std::cout << "[burstqueue] pushing ... " << pushed << std::endl;
+                std::cout << "[burstqueue] pushing  " << pushed << ": " << GST_BUFFER_PTS(buffer) << std::endl;
 
                 GstFlowReturn ret =
                     gst_pad_push(self->srcpad, buffer);
