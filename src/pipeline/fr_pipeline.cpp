@@ -379,19 +379,6 @@ void FRPipeline::add_skip_queuing()
 
     std::cout << "[Pipeline] Inserting queueing + framerate elements with bypass topology" << std::endl;
 
-    // Set queue sizes
-    g_object_set(G_OBJECT(queue_const_fps.get()),
-                 "max-size-buffers", 0,
-                 "max-size-bytes", 0,
-                 "max-size-time", GST_SECOND,
-                 nullptr);
-
-    g_object_set(G_OBJECT(queue.get()),
-                 "max-size-buffers", 0,
-                 "max-size-bytes", 0,
-                 "max-size-time", GST_SECOND,
-                 nullptr);
-
     // 1. Add upstream elements
     pipeline.add_to_pipeline(queue_const_fps);
     pipeline.add_to_pipeline(videorate_const_fps);
@@ -441,9 +428,7 @@ void FRPipeline::add_skip_queuing()
 
     pipeline.unlink_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
     pipeline.link_elements(EL_FR_META_VISUALIZER, EL_FR_SKIP_QUEUE);
-    pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_FRAMERATE);
-    pipeline.link_elements(EL_FRAMERATE, EL_FRAMERATE_FILTER);
-    pipeline.link_elements(EL_FRAMERATE_FILTER, EL_VIDEO_CONVERT_TO_SINK);
+    pipeline.link_elements(EL_FR_SKIP_QUEUE, EL_VIDEO_CONVERT_TO_SINK);
 
     configure_skip_queues(target_fps, probe_data.fr_measurement.max     
                                                         ? probe_data.fr_measurement.max
