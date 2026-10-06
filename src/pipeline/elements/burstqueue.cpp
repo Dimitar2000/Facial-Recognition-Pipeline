@@ -26,6 +26,7 @@
 #include <glibconfig.h>
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
+#include <gst/gstbuffer.h>
 #include <gst/gstpad.h>
 #include <gst/gstpadtemplate.h>
 #include <iostream>
@@ -246,12 +247,12 @@ gst_burst_queue_output_task(gpointer user_data)
                 
                 if (skip)
                 {
-                    std::cout << "[burstqueue] Buffer " << pushed << " -> skip FR" << std::endl;
+                    std::cout << "[burstqueue] Buffer " << pushed << " no FR : " << GST_BUFFER_PTS(buffer) << std::endl;
                     ret = gst_pad_push(self->srcpad_fr_bypass, buffer);
                 }
                 else
                 {
-                    std::cout << "[burstqueue] Buffer " << pushed << " -> FR" << std::endl;
+                    std::cout << "[burstqueue] Buffer " << pushed << " -> FR : " << GST_BUFFER_PTS(buffer) << std::endl;
                     ret = gst_pad_push(self->srcpad_fr, buffer);
                 }
 
@@ -328,6 +329,8 @@ gst_burst_queue_chain(GstPad    *pad,
     */
     gst_burst_queue_adjust_timestamp(self, buffer);
 
+    std::cout << "[burstqueue] Buffer queued : " << GST_BUFFER_PTS(buffer) << std::endl;
+    
     /*
      * Important:
      *
