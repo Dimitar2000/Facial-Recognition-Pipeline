@@ -343,6 +343,11 @@ void FRPipeline::warm_up()
         switch (GST_MESSAGE_TYPE(msg.get()))
         {
         case GST_MESSAGE_ERROR:
+            GError *err;
+            gst_message_parse_error(msg.get(), &err, NULL);
+            g_printerr("[Pipeline] Error received from element %s: %s\n", GST_OBJECT_NAME(msg.get()->src), err->message);
+            g_clear_error(&err);
+
             throw std::runtime_error("Warm up received an error!");
             break;
 
