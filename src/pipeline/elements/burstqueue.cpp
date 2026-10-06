@@ -164,19 +164,11 @@ static void
 gst_burst_queue_adjust_timestamp(GstBurstQueue *self,
                                  GstBuffer    *buffer)
 {
-    GstClockTime pts;
-    GstClockTime dts;
+    GstClockTime pts = GST_BUFFER_PTS(buffer);
 
-    pts = GST_BUFFER_PTS(buffer);
-    dts = GST_BUFFER_DTS(buffer);
+    GST_BUFFER_PTS(buffer) = MAX(pts, self->last_output_pts) + self->timestamp_offset;
+    self->last_output_pts = GST_BUFFER_PTS(buffer);
 
-    if (GST_CLOCK_TIME_IS_VALID(pts)) {
-        GST_BUFFER_PTS(buffer) = pts + self->timestamp_offset;
-    }
-
-    if (GST_CLOCK_TIME_IS_VALID(dts)) {
-        GST_BUFFER_DTS(buffer) = dts + self->timestamp_offset;
-    }
 }
 
 
@@ -240,6 +232,10 @@ gst_burst_queue_output_task(gpointer user_data)
             */
             if (buffer != NULL)
             {
+                g_mutex_lock(&self->lock);
+                gst_burst_queue_adjust_timestamp(self, buffer);
+                g_mutex_unlock(&self->lock);
+                
                 // Skip all but last buffer
                 bool skip = pushed < buffer_count - 1;
 
@@ -323,11 +319,6 @@ gst_burst_queue_chain(GstPad    *pad,
         // ...    
         g_mutex_lock(&self->lock);
     }
-
-    /*
-    * Adjust timestamps before putting in the queue.
-    */
-    gst_burst_queue_adjust_timestamp(self, buffer);
 
     std::cout << "[burstqueue] Buffer queued : " << GST_BUFFER_PTS(buffer) << std::endl;
     
@@ -559,6 +550,7 @@ gst_burst_queue_init(GstBurstQueue *self)
     self->eos = FALSE;
     self->started = FALSE;
     self->have_segment = FALSE;
+    self->last_output_pts = 0;
 
     gst_burst_queue_recalculate(self);
 
