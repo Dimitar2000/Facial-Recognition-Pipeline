@@ -151,12 +151,13 @@ int main(int argc, char *argv[])
         if (emulate_src_fps_chg)
         {
             pipeline->add_virtual_src_fps();
+            pipeline->set_virtual_src_fps(target_fps);
 
             auto t = std::thread([&pipeline] 
             {
                 std::this_thread::sleep_for(std::chrono::seconds(5));
 
-                pipeline->set_virtual_src_fps(10);
+                pipeline->set_virtual_src_fps(1);
 
                 std::this_thread::sleep_for(std::chrono::seconds(5));
 
