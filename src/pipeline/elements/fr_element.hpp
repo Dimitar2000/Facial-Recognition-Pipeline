@@ -20,9 +20,6 @@ void gst_fr_element_init_processor(FRElement *element,
                                    const std::string& sface_model_file_path,
                                    int scaled_dim);
 
-void gst_fr_element_set_skips(FRElement *element,
-                              guint skips);
-
 gboolean gst_fr_element_sink_event(GstPad *pad,
                                    GstObject *parent,
                                    GstEvent *event);

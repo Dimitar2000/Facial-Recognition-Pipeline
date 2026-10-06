@@ -14,8 +14,6 @@ typedef struct _FRElement {
     GstElement element;
     GstPad *sinkpad, *srcpad;
     FRProcessor *processor;
-    guint skips;
-    guint remaining_skips;
 } FRElement;
 
 G_DEFINE_TYPE(FRElement, gst_fr_element, GST_TYPE_ELEMENT);
@@ -72,8 +70,6 @@ static void gst_fr_element_init(FRElement *element)
     gst_element_add_pad(GST_ELEMENT(element), element->srcpad);
 
     element->processor = nullptr;
-    element->skips = 0;
-    element->remaining_skips = 0;
 }
 
 void gst_fr_element_init_processor(FRElement *element,
@@ -86,12 +82,6 @@ void gst_fr_element_init_processor(FRElement *element,
                                             yunet_model_file_path,
                                             sface_model_file_path,
                                             scaled_dim);
-}
-
-void gst_fr_element_set_skips(FRElement *element, guint skips)
-{
-    element->skips = skips;
-    element->remaining_skips = skips;
 }
 
 gboolean gst_fr_element_sink_event(GstPad *pad, GstObject *parent, GstEvent *event)
@@ -113,14 +103,6 @@ GstFlowReturn gst_fr_element_chain(GstPad *pad, GstObject *parent, GstBuffer *bu
     FRElement *element = GST_FR_ELEMENT(parent);
     GstElement *element_gst = GST_ELEMENT(parent);
     TimeRecorder time_recorder;
-
-    if (element->remaining_skips > 0)
-    {
-        element->remaining_skips--;
-        return gst_pad_push(element->srcpad, buf);
-    }
-
-    element->remaining_skips = element->skips;
 
     time_recorder.start("Total");
 

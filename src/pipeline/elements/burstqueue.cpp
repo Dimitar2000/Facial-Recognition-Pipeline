@@ -31,6 +31,7 @@
 #include <iostream>
 
 #include "burstqueue.hpp"
+#include "pipeline/metadata/fr_metadata.hpp"
 
 #define GST_TYPE_BURST_QUEUE (gst_burst_queue_get_type())
 
@@ -206,17 +207,18 @@ gst_burst_queue_output_task(gpointer user_data)
             g_cond_wait(&self->cond, &self->lock);
         }
 
+        int buffer_count = self->config.buffer_count;
+        int pushed = 0;
+
         g_mutex_unlock(&self->lock);
 
         /*
          * Once we've reached N, we're in burst mode until N frames are pushed.
          */
 
-        int pushed = 0;
-
         while(!self->restart
                 && (self->eos && !g_queue_is_empty(self->queue)) 
-                    || pushed < self->config.buffer_count)
+                    || pushed < buffer_count)
         {
             g_mutex_lock(&self->lock);
 
@@ -239,10 +241,23 @@ gst_burst_queue_output_task(gpointer user_data)
             */
             if (buffer != NULL)
             {
-                std::cout << "[burstqueue] pushing  " << pushed << ": " << GST_BUFFER_PTS(buffer) << std::endl;
+                std::cout << "[burstqueue] Pushing  " << pushed << ": " << GST_BUFFER_PTS(buffer) << std::endl;
 
-                GstFlowReturn ret =
-                    gst_pad_push(self->srcpad, buffer);
+                // Skip all but last buffer
+                bool skip = pushed < buffer_count - 1;
+
+                GstFlowReturn ret;
+                
+                if (skip)
+                {
+                    std::cout << "[burstqueue] Bypassing FR" << std::endl;
+                    ret = gst_pad_push(self->srcpad_fr_bypass, buffer);
+                }
+                else
+                {
+                    std::cout << "[burstqueue] Pushing to FR" << std::endl;
+                    ret = gst_pad_push(self->srcpad_fr, buffer);
+                }
 
                 if (ret != GST_FLOW_OK) {
                     GST_ERROR_OBJECT(
@@ -265,7 +280,10 @@ gst_burst_queue_output_task(gpointer user_data)
             */
             if (self->eos && g_queue_is_empty(self->queue)) {
                 gst_pad_push_event(
-                    self->srcpad,
+                    self->srcpad_fr_bypass,
+                    gst_event_new_eos());
+                gst_pad_push_event(
+                    self->srcpad_fr,
                     gst_event_new_eos());
 
                 break;
@@ -359,7 +377,13 @@ gst_burst_queue_sink_event(GstPad    *pad,
         return TRUE;
 
     default:
-        return gst_pad_push_event(self->srcpad, event);
+    {
+        GstEvent *bypass_event = gst_event_ref(event);
+        gboolean fr_result = gst_pad_push_event(self->srcpad_fr, event);
+        gboolean bypass_result = gst_pad_push_event(self->srcpad_fr_bypass,
+                                                     bypass_event);
+        return fr_result && bypass_result;
+    }
     }
 }
 
@@ -477,7 +501,7 @@ gst_burst_queue_class_init(GstBurstQueueClass *klass)
         element_class,
         "Burst Queue",
         "Generic",
-        "Prefill and clock-paced buffer queue",
+        "Prefill and clock-paced buffer queue with dual source output",
         "Example");
 
     GstCaps *caps = gst_caps_from_string(
@@ -487,6 +511,7 @@ gst_burst_queue_class_init(GstBurstQueueClass *klass)
         "height=(int)[1,MAX],"
         "framerate=(fraction)[0/1,MAX]");
 
+    // Standard sink pad template
     gst_element_class_add_pad_template(
         element_class,
         gst_pad_template_new(
@@ -498,7 +523,15 @@ gst_burst_queue_class_init(GstBurstQueueClass *klass)
     gst_element_class_add_pad_template(
         element_class,
         gst_pad_template_new(
-            "src",
+            "src_fr",
+            GST_PAD_SRC,
+            GST_PAD_ALWAYS,
+            caps));
+
+    gst_element_class_add_pad_template(
+        element_class,
+        gst_pad_template_new(
+            "src_fr_bypass",
             GST_PAD_SRC,
             GST_PAD_ALWAYS,
             caps));
@@ -533,7 +566,7 @@ gst_burst_queue_init(GstBurstQueue *self)
     gst_burst_queue_recalculate(self);
 
     /*
-     * Pads.
+     * Sink Pad setup.
      */
     self->sinkpad =
         gst_pad_new_from_template(
@@ -541,13 +574,6 @@ gst_burst_queue_init(GstBurstQueue *self)
                 GST_ELEMENT_GET_CLASS(self),
                 "sink"),
             "sink");
-
-    self->srcpad =
-        gst_pad_new_from_template(
-            gst_element_class_get_pad_template(
-                GST_ELEMENT_GET_CLASS(self),
-                "src"),
-            "src");
 
     gst_pad_set_chain_function(
         self->sinkpad,
@@ -558,10 +584,29 @@ gst_burst_queue_init(GstBurstQueue *self)
         GST_DEBUG_FUNCPTR(gst_burst_queue_sink_event));
 
     gst_element_add_pad(GST_ELEMENT(self), self->sinkpad);
-    gst_element_add_pad(GST_ELEMENT(self), self->srcpad);
 
     /*
-     * Output task.
+     * Source Pads setup (static dual pads).
+     */
+    self->srcpad_fr =
+        gst_pad_new_from_template(
+            gst_element_class_get_pad_template(
+                GST_ELEMENT_GET_CLASS(self),
+                "src_fr"),
+            "src_fr");
+
+    self->srcpad_fr_bypass =
+        gst_pad_new_from_template(
+            gst_element_class_get_pad_template(
+                GST_ELEMENT_GET_CLASS(self),
+                "src_fr_bypass"),
+            "src_fr_bypass");
+
+    gst_element_add_pad(GST_ELEMENT(self), self->srcpad_fr);
+    gst_element_add_pad(GST_ELEMENT(self), self->srcpad_fr_bypass);
+
+    /*
+     * Output task initialization.
      */
     self->task =
         gst_task_new(gst_burst_queue_output_task,

@@ -127,8 +127,8 @@ struct _GstBurstQueue
      * ------------------------------------------------------------------ */
 
     GstPad *sinkpad;
-    GstPad *srcpad;
-
+    GstPad *srcpad_fr;
+    GstPad *srcpad_fr_bypass;
 
     /* ---------------------------------------------------------------------
      * Configuration

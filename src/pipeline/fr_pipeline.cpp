@@ -30,6 +30,7 @@ const char * FRPipeline::EL_Q_CONST_FPS               = "q_const_fps";
 const char * FRPipeline::EL_V_CONST_FPS               = "v_const_fps";
 const char * FRPipeline::EL_F_CONST_FPS               = "f_const_fps";
 const char * FRPipeline::EL_BURSTQUEUE                = "burstqueue";
+const char * FRPipeline::EL_FUNNEL                    = "funnel";
 const char * FRPipeline::EL_FR_ELEMENT                = "facial_recognition_element";
 const char * FRPipeline::EL_FR_SKIP_QUEUE             = "fr_skip_queue";
 const char * FRPipeline::EL_FRAMERATE                 = "framerate";
@@ -161,7 +162,6 @@ void FRPipeline::configure_skip_queues(double target_fps,
                                        nullptr));
     Config config = {slots, target_fps};
 
-    gst_fr_element_set_skips(GST_FR_ELEMENT(element.get()), slots - 1);
     g_object_set(G_OBJECT(burstqueue.get()), "config", &config, nullptr);
     g_object_set(G_OBJECT(const_fps_filter.get()), "caps", caps.get(), nullptr);
     g_object_set(G_OBJECT(framerate_filter.get()), "caps", caps.get(), nullptr);
@@ -325,8 +325,6 @@ void FRPipeline::warm_up()
                                           &this->probe_data,
                                           NULL);
 
-    gst_fr_element_set_skips(GST_FR_ELEMENT(fr_element.get()), 0);
-
     // Run the pipeline until the drop probe sends EOS
     std::cout << "[Pipeline] Starting warm up ..." << std::endl;
 
@@ -374,13 +372,14 @@ void FRPipeline::add_skip_queuing()
     GstElementLM capsfilter_const_fps(gst_element_factory_make("capsfilter", EL_F_CONST_FPS));
     GstElementLM burstqueue(gst_element_factory_make("burstqueue", EL_BURSTQUEUE));
 
+    GstElementLM funnel(gst_element_factory_make("funnel", EL_FUNNEL));
     GstElementLM queue(gst_element_factory_make("queue", EL_FR_SKIP_QUEUE));
     GstElementLM videorate(gst_element_factory_make("videorate", EL_FRAMERATE));
     GstElementLM capsfilter(gst_element_factory_make("capsfilter", EL_FRAMERATE_FILTER));
 
-    std::cout << "[Pipeline] Inserting queueing + framerate elements" << std::endl;
+    std::cout << "[Pipeline] Inserting queueing + framerate elements with bypass topology" << std::endl;
 
-            // Set queue size
+    // Set queue sizes
     g_object_set(G_OBJECT(queue_const_fps.get()),
                  "max-size-buffers", 0,
                  "max-size-bytes", 0,
@@ -393,21 +392,52 @@ void FRPipeline::add_skip_queuing()
                  "max-size-time", GST_SECOND,
                  nullptr);
 
+    // 1. Add upstream elements
     pipeline.add_to_pipeline(queue_const_fps);
     pipeline.add_to_pipeline(videorate_const_fps);
     pipeline.add_to_pipeline(capsfilter_const_fps);
     pipeline.add_to_pipeline(burstqueue);
 
+    // 2. Link upstream sequence up to burstqueue
     pipeline.unlink_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_FR_ELEMENT);
     pipeline.link_elements(EL_VIDEO_CONVERT_FROM_SOURCE, EL_Q_CONST_FPS);
     pipeline.link_elements(EL_Q_CONST_FPS, EL_V_CONST_FPS);
     pipeline.link_elements(EL_V_CONST_FPS, EL_F_CONST_FPS);
     pipeline.link_elements(EL_F_CONST_FPS, EL_BURSTQUEUE);
-    pipeline.link_elements(EL_BURSTQUEUE, EL_FR_ELEMENT);
 
+    // 3. Add downstream merge and skip queue elements
+    pipeline.add_to_pipeline(funnel);
     pipeline.add_to_pipeline(queue);
     pipeline.add_to_pipeline(videorate);
     pipeline.add_to_pipeline(capsfilter);
+
+    // 4. Link Split Topology: burstqueue -> (fr_element & bypass) -> funnel
+    // Fetch elements from pipeline
+    pipeline.unlink_elements(EL_FR_ELEMENT, EL_FR_META_VISUALIZER);
+
+    GstElementLM fr_elem = pipeline.get_by_name(EL_FR_ELEMENT);
+    burstqueue = pipeline.get_by_name(EL_BURSTQUEUE);
+    funnel     = pipeline.get_by_name(EL_FUNNEL);
+
+    // Get pads from burstqueue (adjust pad names 'src_0'/'src_1' or dynamic request pads according to burstqueue design)
+    GstPadLM bq_src_fr(gst_element_get_static_pad(burstqueue.get(), "src_fr")); 
+    GstPadLM bq_src_fr_bypass(gst_element_get_static_pad(burstqueue.get(), "src_fr_bypass"));
+
+    GstPadLM fr_sink(gst_element_get_static_pad(fr_elem.get(), "sink"));
+    GstPadLM fr_src(gst_element_get_static_pad(fr_elem.get(), "src"));
+
+    GstPadLM funnel_sink0(gst_element_request_pad_simple(funnel.get(), "sink_%u"));
+    GstPadLM funnel_sink1(gst_element_request_pad_simple(funnel.get(), "sink_%u"));
+
+    // Branch A: burstqueue -> fr_element -> funnel
+    gst_pad_link(bq_src_fr.get(), fr_sink.get());
+    gst_pad_link(fr_src.get(), funnel_sink0.get());
+
+    // Branch B (Bypass): burstqueue -> funnel
+    gst_pad_link(bq_src_fr_bypass.get(), funnel_sink1.get());
+
+    // 5. Link funnel output downstream
+    pipeline.link_elements(EL_FUNNEL, EL_FR_META_VISUALIZER);
 
     pipeline.unlink_elements(EL_FR_META_VISUALIZER, EL_VIDEO_CONVERT_TO_SINK);
     pipeline.link_elements(EL_FR_META_VISUALIZER, EL_FR_SKIP_QUEUE);
