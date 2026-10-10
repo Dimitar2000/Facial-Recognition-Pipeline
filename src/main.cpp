@@ -163,17 +163,17 @@ int main(int argc, char *argv[])
 
                 pipeline->set_virtual_src_fps(15);
 
-                std::this_thread::sleep_for(std::chrono::seconds(5));
+                // std::this_thread::sleep_for(std::chrono::seconds(5));
 
-                pipeline->set_virtual_src_fps(10);
+                // pipeline->set_virtual_src_fps(10);
 
-                std::this_thread::sleep_for(std::chrono::seconds(5));
+                // std::this_thread::sleep_for(std::chrono::seconds(5));
 
-                pipeline->set_virtual_src_fps(5);
+                // pipeline->set_virtual_src_fps(5);
 
-                std::this_thread::sleep_for(std::chrono::seconds(5));
+                // std::this_thread::sleep_for(std::chrono::seconds(5));
 
-                pipeline->set_virtual_src_fps(25);
+                // pipeline->set_virtual_src_fps(25);
             });
 
             pipeline->run();

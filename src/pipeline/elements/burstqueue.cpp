@@ -150,7 +150,10 @@ gst_burst_queue_recalculate(GstBurstQueue *self)
         self->timestamp_offset = 0;
     }
 
-    std::cout << "[burstqueue] Clearing queue ..." << std::endl;
+    std::cout << "[burstqueue] Clearing wait queue with " 
+              << g_queue_get_length(self->wait_queue) 
+              << " buffers ..." 
+              << std::endl;
 
     /*
      * Clear the queue to avoid different PTS offsets in next burst 
