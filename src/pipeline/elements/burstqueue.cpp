@@ -151,7 +151,20 @@ gst_burst_queue_recalculate(GstBurstQueue *self)
     }
 
     std::cout << "[burstqueue] Flushing queue ..." << std::endl;
+
+    /*
+     * Clear the queue to avoid different PTS offsets in next burst 
+     */
     g_queue_clear(self->queue);
+
+    /*
+     * Important:
+     *
+     * Signal that buffers have been popped from the queue.
+     * This avoids cond_wait to block the filling indefinitely.
+     */
+    g_cond_signal(&self->cond_buf_popped);
+
     self->restart = TRUE;
 }
 
@@ -214,7 +227,6 @@ gst_burst_queue_output_task(gpointer user_data)
         /*
          * Once we've reached N, we're in burst mode until N frames are pushed.
          */
-
         while(!self->restart
                 && (self->eos && !g_queue_is_empty(self->queue)) 
                     || pushed < buffer_count)
@@ -227,6 +239,14 @@ gst_burst_queue_output_task(gpointer user_data)
             * There is intentionally+ NO clock wait here.
             */
             buffer = (GstBuffer *)g_queue_pop_head(self->queue);
+
+            /*
+             * Signal that a buffer has been popped from the queue.
+             */
+            if (buffer != NULL)
+            {
+                g_cond_signal(&self->cond_buf_popped);
+            }
 
             g_mutex_unlock(&self->lock);
 
@@ -318,10 +338,13 @@ gst_burst_queue_chain(GstPad    *pad,
 
     g_mutex_lock(&self->lock);
     
+    /*
+     * If queue is full, wait for a signal that a new buffer has been popped.
+    */
     while (g_queue_get_length(self->queue) >= 2 * self->config.buffer_count) {
-        g_mutex_unlock(&self->lock);  
-        // ...    
-        g_mutex_lock(&self->lock);
+        std::cout << "[burstqueue] Waiting for " << g_queue_get_length(self->queue) - 2 * self->config.buffer_count + 1 << " buffers to be pushed ..." << std::endl;
+
+        g_cond_wait(&self->cond_buf_popped, &self->lock);
     }
 
     /*
@@ -551,6 +574,7 @@ gst_burst_queue_init(GstBurstQueue *self)
 
     g_mutex_init(&self->lock);
     g_cond_init(&self->cond);
+    g_cond_init(&self->cond_buf_popped);
     g_rec_mutex_init(&self->task_lock);
 
     gst_segment_init(&self->segment, GST_FORMAT_TIME);

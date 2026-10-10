@@ -198,6 +198,7 @@ struct _GstBurstQueue
      *   - EOS has arrived
      */
     GCond cond;
+    GCond cond_buf_popped;
 
 
     /* ---------------------------------------------------------------------
