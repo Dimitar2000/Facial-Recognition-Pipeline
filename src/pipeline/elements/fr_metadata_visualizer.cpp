@@ -105,7 +105,6 @@ static void gst_fr_metadata_visualizer_handle_metadata(FRMetadataVisualizer& met
             auto id = face.identity;
             
             metadata_lines = {
-                g_strdup_printf("Visualize"),
                 g_strdup_printf("%s", id->name.c_str()),
                 g_strdup_printf("%i/%i", id->reference_matches, id->reference_images),
                 g_strdup_printf("(%.3g, %.3g)", id->min_similarity, id->max_similarity)
