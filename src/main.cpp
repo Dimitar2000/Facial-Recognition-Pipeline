@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
     // Run the pipeline
     try 
     {
-        pipeline->warm_up();
+        pipeline->run_warm_up();
         pipeline->add_skip_queuing();
 
         if (emulate_src_fps_chg)

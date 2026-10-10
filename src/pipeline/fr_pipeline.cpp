@@ -312,7 +312,7 @@ void FRPipeline::handle_msg_reconfigure_fps(const GstStructure * s)
     configure_skip_queues(target_fps, probe_data.fr_measurement.max);
 }
 
-void FRPipeline::warm_up()
+void FRPipeline::run_warm_up()
 {
     GstElementLM fr_element = pipeline.get_by_name(EL_FR_ELEMENT);
 

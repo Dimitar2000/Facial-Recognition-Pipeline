@@ -18,7 +18,7 @@ class FRPipeline
         //      - the FR stage's latency to be measured for the actual workload
         //      - the optimal skip+queue configuration to be created so that 
         //          minimum amount of frames are skipped
-        void warm_up();
+        void run_warm_up();
 
         // Extend the pipeline with a post-FR queue and  
         void add_skip_queuing();
