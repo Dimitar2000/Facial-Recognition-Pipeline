@@ -307,7 +307,7 @@ gst_burst_queue_chain(GstPad    *pad,
      * If queue is full, wait for a signal that a new buffer batch 
      * has been transfered from stage 1 to stage 2 queue.
      */
-    while (g_queue_get_length(self->wait_queue) >= 2 * self->config.buffer_count) {
+    while (g_queue_get_length(self->wait_queue) >= self->config.buffer_count) {
         std::cout << "[burstqueue] Waiting for buffers to be transfered ..." << std::endl;
         g_cond_wait(&self->cond_buf_transfered, &self->lock);
     }
@@ -316,8 +316,6 @@ gst_burst_queue_chain(GstPad    *pad,
      * Push to stage 1 queue.
      */
     g_queue_push_tail(self->wait_queue, buffer);
-
-    std::cout << "[burstqueue] Buffer queued : " << GST_BUFFER_PTS(buffer) << std::endl;
 
     /*
      * Signal that a buffer is pushed.
