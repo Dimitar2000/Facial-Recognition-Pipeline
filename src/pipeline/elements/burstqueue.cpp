@@ -273,20 +273,21 @@ gst_burst_queue_output_task(gpointer user_data)
                 error = true;
                 break;
             }
+        }
 
-            /*
-            * EOS + empty queue.
-            */
-            if (self->eos) {
-                gst_pad_push_event(
-                    self->srcpad_fr_bypass,
-                    gst_event_new_eos());
-                gst_pad_push_event(
-                    self->srcpad_fr,
-                    gst_event_new_eos());
+        /*
+        * EOS + empty queue.
+        */
+        if (self->eos) 
+        {
+            gst_pad_push_event(
+                self->srcpad_fr_bypass,
+                gst_event_new_eos());
+            gst_pad_push_event(
+                self->srcpad_fr,
+                gst_event_new_eos());
 
-                break;
-            }
+            break;
         }
     }
 }
