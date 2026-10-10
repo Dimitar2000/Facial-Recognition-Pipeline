@@ -171,7 +171,8 @@ struct _GstBurstQueue
      * Ownership of GstBuffer references is held by this queue until the
      * buffer is popped and pushed downstream.
      */
-    GQueue *queue;
+    GQueue *wait_queue;
+    GQueue *push_queue;
 
 
     /* ---------------------------------------------------------------------
@@ -197,8 +198,14 @@ struct _GstBurstQueue
      *   - flush state has changed
      *   - EOS has arrived
      */
-    GCond cond;
-    GCond cond_buf_popped;
+    GCond cond_buf_pushed;
+
+    /**
+     * Signals:
+     * 
+     *  - buffer batch transfered: stage 1 ==> stage 2 queue
+     */
+    GCond cond_buf_transfered;
 
 
     /* ---------------------------------------------------------------------
@@ -229,12 +236,6 @@ struct _GstBurstQueue
     /* ---------------------------------------------------------------------
      * Runtime state
      * ------------------------------------------------------------------ */
-
-    /**
-     * TRUE after FLUSH_START and until FLUSH_STOP.
-     */
-    gboolean restart;
-
     /**
      * TRUE after receiving EOS.
      *

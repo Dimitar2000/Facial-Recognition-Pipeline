@@ -150,12 +150,12 @@ gst_burst_queue_recalculate(GstBurstQueue *self)
         self->timestamp_offset = 0;
     }
 
-    std::cout << "[burstqueue] Flushing queue ..." << std::endl;
+    std::cout << "[burstqueue] Clearing queue ..." << std::endl;
 
     /*
      * Clear the queue to avoid different PTS offsets in next burst 
      */
-    g_queue_clear(self->queue);
+    g_queue_clear(self->wait_queue);
 
     /*
      * Important:
@@ -163,9 +163,7 @@ gst_burst_queue_recalculate(GstBurstQueue *self)
      * Signal that buffers have been popped from the queue.
      * This avoids cond_wait to block the filling indefinitely.
      */
-    g_cond_signal(&self->cond_buf_popped);
-
-    self->restart = TRUE;
+    g_cond_signal(&self->cond_buf_transfered);
 }
 
 
@@ -212,90 +210,77 @@ gst_burst_queue_output_task(gpointer user_data)
         /*
          * Wait for signal that new burst can be done
          */
-        while(!self->restart 
-              &&  ((self->eos && !g_queue_is_empty(self->queue)) 
-                    || g_queue_get_length(self->queue) < self->config.buffer_count))
+        while((self->eos && !g_queue_is_empty(self->wait_queue)) 
+                || g_queue_get_length(self->wait_queue) < self->config.buffer_count)
         {
-            g_cond_wait(&self->cond, &self->lock);
+            g_cond_wait(&self->cond_buf_pushed, &self->lock);
         }
 
-        int buffer_count = self->config.buffer_count;
-        int pushed = 0;
+        int num_buffers_to_transfer = (self->eos) ? g_queue_get_length(self->wait_queue) : self->config.buffer_count;
 
+        /*
+         * Transfer N buffers to stage 2 queue
+         */
+        for (int i = 0; i < num_buffers_to_transfer; i++)
+        {
+            buffer = (GstBuffer *)g_queue_pop_head(self->wait_queue);
+            g_queue_push_tail(self->push_queue, buffer);
+        }
+
+        /*
+         * Signal that a buffer has been popped from the queue.
+         */
+        g_cond_signal(&self->cond_buf_transfered);
+
+        /*
+         * Release mutex.
+         *
+         * After this point, there should be no locking or race conditions.
+         */
         g_mutex_unlock(&self->lock);
 
         /*
-         * Once we've reached N, we're in burst mode until N frames are pushed.
+         * We're in burst mode until stage 2 queue is empty:
          */
-        while(!self->restart
-                && (self->eos && !g_queue_is_empty(self->queue)) 
-                    || pushed < buffer_count)
+        while(!g_queue_is_empty(self->push_queue))
         {
-            g_mutex_lock(&self->lock);
+            buffer = (GstBuffer *)g_queue_pop_head(self->push_queue);
+
+            GstFlowReturn ret;
 
             /*
-            * Take exactly one buffer.
-            *
-            * There is intentionally+ NO clock wait here.
-            */
-            buffer = (GstBuffer *)g_queue_pop_head(self->queue);
-
-            /*
-             * Signal that a buffer has been popped from the queue.
+             * Skip all but last buffer
+             *
+             * Important:
+             *
+             * This can block while FR processes the frame.
+             * But the wait_queue is still filled until full.
              */
-            if (buffer != NULL)
+            if (!g_queue_is_empty(self->push_queue))
             {
-                g_cond_signal(&self->cond_buf_popped);
-            }
-
-            g_mutex_unlock(&self->lock);
-
-            /*
-            * This can block while FR processes the frame.
-            *
-            * That's intentional.
-            *
-            * The sink chain continues independently and can keep
-            * filling self->queue while we're blocked here.
-            */
-            if (buffer != NULL)
-            {
-                // Skip all but last buffer
-                bool skip = pushed < buffer_count - 1;
-
-                GstFlowReturn ret;
-                
-                if (skip)
-                {
-                    std::cout << "[burstqueue] Buffer " << pushed << " no FR : " << GST_BUFFER_PTS(buffer) << std::endl;
-                    ret = gst_pad_push(self->srcpad_fr_bypass, buffer);
-                }
-                else
-                {
-                    std::cout << "[burstqueue] Buffer " << pushed << " -> FR : " << GST_BUFFER_PTS(buffer) << std::endl;
-                    ret = gst_pad_push(self->srcpad_fr, buffer);
-                }
-
-                if (ret != GST_FLOW_OK) {
-                    GST_ERROR_OBJECT(
-                        self,
-                        "Downstream returned %s",
-                        gst_flow_get_name(ret));
-
-                    error = true;
-                    break;
-                }
+                std::cout << "[burstqueue] Buffer no FR : " << GST_BUFFER_PTS(buffer) << std::endl;
+                ret = gst_pad_push(self->srcpad_fr_bypass, buffer);
             }
             else
             {
-                std::cout << "[burstqueue] NULL buffer " << pushed << std::endl;
+                std::cout << "[burstqueue] Buffer -> FR : " << GST_BUFFER_PTS(buffer) << std::endl;
+                ret = gst_pad_push(self->srcpad_fr, buffer);
+            }
+
+            if (ret != GST_FLOW_OK) {
+                GST_ERROR_OBJECT(
+                    self,
+                    "Downstream returned %s",
+                    gst_flow_get_name(ret));
+
+                error = true;
                 break;
             }
 
             /*
             * EOS + empty queue.
             */
-            if (self->eos && g_queue_is_empty(self->queue)) {
+            if (self->eos) {
                 gst_pad_push_event(
                     self->srcpad_fr_bypass,
                     gst_event_new_eos());
@@ -305,22 +290,7 @@ gst_burst_queue_output_task(gpointer user_data)
 
                 break;
             }
-
-            /*
-             * This burst was not initiated because of EOS.
-             */
-            pushed++;
         }
-
-        g_mutex_lock(&self->lock);
-        
-        if (self->restart)
-        {
-            self->restart = FALSE;
-            std::cout << "Restart completed" << std::endl;
-        }
-
-        g_mutex_unlock(&self->lock);
     }
 }
 
@@ -339,32 +309,30 @@ gst_burst_queue_chain(GstPad    *pad,
     g_mutex_lock(&self->lock);
     
     /*
-     * If queue is full, wait for a signal that a new buffer has been popped.
-    */
-    while (g_queue_get_length(self->queue) >= 2 * self->config.buffer_count) {
-        std::cout << "[burstqueue] Waiting for " << g_queue_get_length(self->queue) - 2 * self->config.buffer_count + 1 << " buffers to be pushed ..." << std::endl;
-
-        g_cond_wait(&self->cond_buf_popped, &self->lock);
+     * If queue is full, wait for a signal that a new buffer batch 
+     * has been transfered from stage 1 to stage 2 queue.
+     */
+    while (g_queue_get_length(self->wait_queue) >= 2 * self->config.buffer_count) {
+        std::cout << "[burstqueue] Waiting for buffers to be transfered ..." << std::endl;
+        g_cond_wait(&self->cond_buf_transfered, &self->lock);
     }
 
     /*
-    * Adjust timestamps before putting in the queue.
-    */
+     * Adjust timestamps before pushing to the stage 1 queue.
+     */
     gst_burst_queue_adjust_timestamp(self, buffer);
-
-    std::cout << "[burstqueue] Buffer queued : " << GST_BUFFER_PTS(buffer) << std::endl;
     
     /*
-     * Important:
-     *
-     * We NEVER drop here.
-     *
-     * Upstream can continue producing while the output task is
-     * waiting for its next pacing point.
+     * Push to stage 1 queue.
      */
-    g_queue_push_tail(self->queue, buffer);
+    g_queue_push_tail(self->wait_queue, buffer);
 
-    g_cond_signal(&self->cond);
+    std::cout << "[burstqueue] Buffer queued : " << GST_BUFFER_PTS(buffer) << std::endl;
+
+    /*
+     * Signal that a buffer is pushed.
+     */
+    g_cond_signal(&self->cond_buf_pushed);
 
     g_mutex_unlock(&self->lock);
 
@@ -390,7 +358,7 @@ gst_burst_queue_sink_event(GstPad    *pad,
         g_mutex_lock(&self->lock);
 
         self->eos = TRUE;
-        g_cond_broadcast(&self->cond);
+        g_cond_broadcast(&self->cond_buf_pushed);
 
         g_mutex_unlock(&self->lock);
 
@@ -424,10 +392,10 @@ gst_burst_queue_change_state(GstElement    *element,
 
         g_mutex_lock(&self->lock);
 
-        g_cond_broadcast(&self->cond);
+        g_cond_broadcast(&self->cond_buf_pushed);
 
-        while (!g_queue_is_empty(self->queue)) {
-            GstBuffer *buffer = (GstBuffer *)g_queue_pop_head(self->queue);
+        while (!g_queue_is_empty(self->wait_queue)) {
+            GstBuffer *buffer = (GstBuffer *)g_queue_pop_head(self->wait_queue);
 
             gst_buffer_unref(buffer);
         }
@@ -464,9 +432,16 @@ gst_burst_queue_finalize(GObject *object)
 
     g_mutex_lock(&self->lock);
 
-    while (!g_queue_is_empty(self->queue)) {
+    while (!g_queue_is_empty(self->wait_queue)) {
         GstBuffer *buffer = (GstBuffer *)
-            g_queue_pop_head(self->queue);
+            g_queue_pop_head(self->wait_queue);
+
+        gst_buffer_unref(buffer);
+    }
+
+    while (!g_queue_is_empty(self->push_queue)) {
+        GstBuffer *buffer = (GstBuffer *)
+            g_queue_pop_head(self->push_queue);
 
         gst_buffer_unref(buffer);
     }
@@ -475,9 +450,10 @@ gst_burst_queue_finalize(GObject *object)
 
     gst_object_unref(self->task);
 
-    g_queue_free(self->queue);
+    g_queue_free(self->wait_queue);
 
-    g_cond_clear(&self->cond);
+    g_cond_clear(&self->cond_buf_pushed);
+    g_cond_clear(&self->cond_buf_transfered);
     g_mutex_clear(&self->lock);
     g_rec_mutex_clear(&self->task_lock);
 
@@ -570,16 +546,16 @@ gst_burst_queue_init(GstBurstQueue *self)
     self->config.buffer_count = 1;
     self->config.fps = 20.0f;
 
-    self->queue = g_queue_new();
+    self->wait_queue = g_queue_new();
+    self->push_queue = g_queue_new();
 
     g_mutex_init(&self->lock);
-    g_cond_init(&self->cond);
-    g_cond_init(&self->cond_buf_popped);
+    g_cond_init(&self->cond_buf_pushed);
+    g_cond_init(&self->cond_buf_transfered);
     g_rec_mutex_init(&self->task_lock);
 
     gst_segment_init(&self->segment, GST_FORMAT_TIME);
 
-    self->restart = FALSE;
     self->eos = FALSE;
     self->started = FALSE;
     self->have_segment = FALSE;
