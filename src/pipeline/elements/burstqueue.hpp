@@ -160,10 +160,6 @@ struct _GstBurstQueue
      */
     GstClockTime timestamp_offset;
 
-    /**
-     * Last PTS assigned to an output buffer.
-     */
-    GstClockTime last_output_pts;
 
     /* ---------------------------------------------------------------------
      * Internal buffer queue
@@ -191,7 +187,6 @@ struct _GstBurstQueue
      *   eos
      *   started
      *   timestamp_offset
-     *   last_output_pts
      */
     GMutex lock;
 
