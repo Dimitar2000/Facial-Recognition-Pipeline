@@ -150,16 +150,6 @@ gst_burst_queue_recalculate(GstBurstQueue *self)
         self->timestamp_offset = 0;
     }
 
-    std::cout << "[burstqueue] Clearing wait queue with " 
-              << g_queue_get_length(self->wait_queue) 
-              << " buffers ..." 
-              << std::endl;
-
-    /*
-     * Clear the queue to avoid different PTS offsets in next burst 
-     */
-    g_queue_clear(self->wait_queue);
-
     /*
      * Important:
      *
@@ -219,6 +209,7 @@ gst_burst_queue_output_task(gpointer user_data)
         for (int i = 0; i < num_buffers_to_transfer; i++)
         {
             buffer = (GstBuffer *)g_queue_pop_head(self->wait_queue);
+            gst_burst_queue_adjust_timestamp(self, buffer);
             g_queue_push_tail(self->push_queue, buffer);
         }
 
@@ -240,8 +231,6 @@ gst_burst_queue_output_task(gpointer user_data)
         while(!g_queue_is_empty(self->push_queue))
         {
             buffer = (GstBuffer *)g_queue_pop_head(self->push_queue);
-
-            gst_burst_queue_adjust_timestamp(self, buffer);
 
             GstFlowReturn ret;
 
