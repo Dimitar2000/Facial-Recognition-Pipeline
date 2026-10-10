@@ -178,19 +178,11 @@ static void
 gst_burst_queue_adjust_timestamp(GstBurstQueue *self,
                                  GstBuffer    *buffer)
 {
-    GstClockTime pts;
-    GstClockTime dts;
+    GstClockTime pts = GST_BUFFER_PTS(buffer);
 
-    pts = GST_BUFFER_PTS(buffer);
-    dts = GST_BUFFER_DTS(buffer);
+    GST_BUFFER_PTS(buffer) = MAX(pts, self->last_output_pts) + self->timestamp_offset;
+    self->last_output_pts = GST_BUFFER_PTS(buffer);
 
-    if (GST_CLOCK_TIME_IS_VALID(pts)) {
-        GST_BUFFER_PTS(buffer) = pts + self->timestamp_offset;
-    }
-
-    if (GST_CLOCK_TIME_IS_VALID(dts)) {
-        GST_BUFFER_DTS(buffer) = dts + self->timestamp_offset;
-    }
 }
 
 
@@ -248,6 +240,8 @@ gst_burst_queue_output_task(gpointer user_data)
         while(!g_queue_is_empty(self->push_queue))
         {
             buffer = (GstBuffer *)g_queue_pop_head(self->push_queue);
+
+            gst_burst_queue_adjust_timestamp(self, buffer);
 
             GstFlowReturn ret;
 
@@ -319,11 +313,6 @@ gst_burst_queue_chain(GstPad    *pad,
         std::cout << "[burstqueue] Waiting for buffers to be transfered ..." << std::endl;
         g_cond_wait(&self->cond_buf_transfered, &self->lock);
     }
-
-    /*
-     * Adjust timestamps before pushing to the stage 1 queue.
-     */
-    gst_burst_queue_adjust_timestamp(self, buffer);
     
     /*
      * Push to stage 1 queue.
@@ -562,6 +551,7 @@ gst_burst_queue_init(GstBurstQueue *self)
     self->eos = FALSE;
     self->started = FALSE;
     self->have_segment = FALSE;
+    self->last_output_pts = 0;
 
     gst_burst_queue_recalculate(self);
 
