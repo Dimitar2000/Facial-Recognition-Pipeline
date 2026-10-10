@@ -313,11 +313,6 @@ gst_burst_queue_chain(GstPad    *pad,
     }
 
     /*
-     * Adjust timestamps before pushing to the stage 1 queue.
-     */
-    gst_burst_queue_adjust_timestamp(self, buffer);
-    
-    /*
      * Push to stage 1 queue.
      */
     g_queue_push_tail(self->wait_queue, buffer);
