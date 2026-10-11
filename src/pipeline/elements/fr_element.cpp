@@ -7,6 +7,7 @@
 #include <gst/video/video-info.h>
 
 #include "fr/cpu_fr_processor.hpp"
+#include "fr/gpu_fr_processor.hpp"
 #include "pipeline/metadata/fr_metadata.hpp"
 #include "util/record.hpp"
 
@@ -78,7 +79,7 @@ void gst_fr_element_init_processor(FRElement *element,
                                    const std::string& sface_model_file_path,
                                    int scaled_dim)
 {
-    element->processor = new CPUFRProcessor(face_dataset_file_path,
+    element->processor = new GPUFRProcessor(face_dataset_file_path,
                                             yunet_model_file_path,
                                             sface_model_file_path,
                                             scaled_dim);

@@ -5,10 +5,18 @@ project(facial-recog-pipeline)
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 find_package(PkgConfig REQUIRED)
+
+set(OpenCV_DIR "/home/mitko/Libraries/opencv/build" CACHE PATH "Path to the CUDA-enabled OpenCV build")
+list(PREPEND CMAKE_MODULE_PATH "${OpenCV_DIR}/../cmake")
+
+find_package(OpenCV 5 REQUIRED CONFIG
+    PATHS /usr/local/lib/cmake/opencv5
+    NO_DEFAULT_PATH
+)
+
 set(PKG_CONFIG_DEPENDENCIES
 	gstreamer-1.0
 	gstreamer-video-1.0
-	opencv4
 )
 
 set(DEPENDENCY_TARGETS)
@@ -30,6 +38,7 @@ add_executable(facial-recog-pipeline
 			   src/pipeline/webcam_fr_pipeline.cpp
 			   src/fr/fr_processor.cpp
 			   src/fr/cpu_fr_processor.cpp
+			   src/fr/gpu_fr_processor.cpp
 			   src/util/yaml.cpp
 			   src/pipeline/webcam_fr_pipeline.hpp
 			   src/pipeline/mp4_fr_pipeline.hpp
@@ -39,7 +48,7 @@ add_executable(facial-recog-pipeline
 )
 
 target_include_directories(facial-recog-pipeline PRIVATE src/)
+target_include_directories(facial-recog-pipeline PRIVATE ${OpenCV_INCLUDE_DIRS})
 
 target_link_libraries(facial-recog-pipeline PRIVATE ${DEPENDENCY_TARGETS})
-
-
+target_link_libraries(facial-recog-pipeline PRIVATE ${OpenCV_LIBS})

@@ -2,6 +2,8 @@
 
 #include "fr/fr_processor.hpp"
 
+#include <glib.h>
+#include <opencv2/dnn.hpp>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/objdetect/face.hpp>
 #include <string>
@@ -34,4 +36,13 @@ class GPUFRProcessor: public FRProcessor
                        int scaled_dim);
 
         virtual std::vector<FRProcessor::DetectedFace> process_frame(cv::Mat& frame) override;
+
+    protected:
+        std::vector<cv::Mat>    detect_faces(cv::Mat& frame,
+                                               float dim_scale_factor);
+
+        std::vector<DetectedFace> recognise_faces(cv::Mat& frame, 
+                                                  const std::vector<cv::Mat>& detected_faces);
+
+        cv::dnn::Net yunet;
 };
