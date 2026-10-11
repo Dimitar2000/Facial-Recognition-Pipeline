@@ -68,6 +68,7 @@ std::vector<FRProcessor::DetectedFace> GPUFRProcessor::process_frame(cv::Mat& fr
 std::vector<cv::Mat> GPUFRProcessor::detect_faces(cv::Mat& scaled_frame, float dim_scale_factor)
 {
     const cv::Size input_size(320, 320);
+    
     const float scale_x = static_cast<float>(scaled_frame.cols) / input_size.width;
     const float scale_y = static_cast<float>(scaled_frame.rows) / input_size.height;
 
@@ -75,9 +76,10 @@ std::vector<cv::Mat> GPUFRProcessor::detect_faces(cv::Mat& scaled_frame, float d
         scaled_frame,
         1.0,
         input_size,
-        cv::Scalar(104, 117, 123),
+        cv::Scalar(),
         false,
-        false
+        false,
+        CV_32F
     );
 
     std::vector<cv::Mat> outputs;
@@ -130,16 +132,16 @@ std::vector<cv::Mat> GPUFRProcessor::detect_faces(cv::Mat& scaled_frame, float d
                 float cx = x * stride;
                 float cy = y * stride;
 
-                float dx = bbox_s.at<float>(0, idx, 0);
-                float dy = bbox_s.at<float>(0, idx, 1);
+                float dx = bbox_s.at<float>(0, idx, 0) * stride;
+                float dy = bbox_s.at<float>(0, idx, 1) * stride;
                 float dw = bbox_s.at<float>(0, idx, 2);
                 float dh = bbox_s.at<float>(0, idx, 3);
 
                 float w = std::exp(dw) * stride;
                 float h = std::exp(dh) * stride;
                 
-                face_data[0] = dim_scale_factor * scale_x * ((x + dx - std::exp(dw) * 0.5f) * stride);
-                face_data[1] = dim_scale_factor * scale_y * ((y + dy - std::exp(dh) * 0.5f) * stride);
+                face_data[0] = dim_scale_factor * scale_x * (cx + dx - w * 0.5f);
+                face_data[1] = dim_scale_factor * scale_y * (cy + dy - h * 0.5f);
                 face_data[2] = dim_scale_factor * scale_x * w;
                 face_data[3] = dim_scale_factor * scale_y * h;
 
