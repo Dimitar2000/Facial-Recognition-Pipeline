@@ -4,7 +4,7 @@
 #include <string>
 
 #include "config_calculator.hpp"
-#include "gst_wrappers/gst_element_lm.hpp"
+#include "gst_wrappers/gst_lm.hpp"
 
 class FRPipeline
 {

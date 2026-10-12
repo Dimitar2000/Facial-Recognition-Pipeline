@@ -45,6 +45,7 @@ add_executable(facial-recog-pipeline
 			   src/pipeline/elements/fr_element.hpp
 			   src/pipeline/elements/fr_metadata_visualizer.hpp
 			   src/util/record.hpp
+			   src/gst_wrappers/gst_lm.hpp
 )
 
 target_include_directories(facial-recog-pipeline PRIVATE src/)

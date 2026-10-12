@@ -3,7 +3,7 @@
 #include <string>
 
 #include "fr_pipeline.hpp"
-#include "gst_wrappers/gst_element_lm.hpp"
+#include "gst_wrappers/gst_lm.hpp"
 
 class WebcamFRPipeline : public FRPipeline
 {

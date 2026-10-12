@@ -17,7 +17,7 @@
 #include <stdexcept>
 
 #include "elements/fr_element.hpp"
-#include "gst_wrappers/gst_element_lm.hpp"
+#include "gst_wrappers/gst_lm.hpp"
 #include "pipeline/elements/burstqueue.hpp"
 
 const char * FRPipeline::EL_PIPELINE                  = "pipeline";
