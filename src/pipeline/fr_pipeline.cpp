@@ -52,7 +52,7 @@ FRPipeline::FRPipeline(double target_fps,
 {
     pipeline = GstPipelineLM(gst_pipeline_new(EL_PIPELINE));
 
-    GstElementLM src_pl_endpoint = gst_element_factory_make("identity", EL_SRC_ENDPOINT);
+    GstElementLM src_pl_endpoint(gst_element_factory_make("identity", EL_SRC_ENDPOINT));
     GstElementLM video_convert(gst_element_factory_make("videoconvert", EL_VIDEO_CONVERT_FROM_SOURCE));
     GstElementLM fr_element(gst_element_factory_make("fr-element", EL_FR_ELEMENT));
     GstElementLM fr_meta_visualizer(gst_element_factory_make("fr-metadata-visualizer", EL_FR_META_VISUALIZER));
@@ -109,8 +109,8 @@ void FRPipeline::attach_fr_measurement_probes()
 
 void FRPipeline::attach_source_caps_event_probe()
 {
-    GstPadLM src_pad = gst_element_get_static_pad(pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE).get(), 
-                                                  "src");
+    GstPadLM src_pad(gst_element_get_static_pad(pipeline.get_by_name(EL_VIDEO_CONVERT_FROM_SOURCE).get(), 
+                                                    "src"));
 
     gst_pad_add_probe(src_pad.get(),
                       GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
@@ -480,7 +480,7 @@ void FRPipeline::run()
     gst_element_set_state(pipeline.get(), GST_STATE_PLAYING);
 
     bool run = true;
-    GstBusLM bus = gst_element_get_bus(pipeline.get());
+    GstBusLM bus(gst_element_get_bus(pipeline.get()));
 
     while (run)
     {

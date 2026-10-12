@@ -1,105 +1,117 @@
 #pragma once
 
 #include <gst/gstbin.h>
+#include <gst/gstbus.h>
 #include <gst/gstelement.h>
+#include <gst/gstmessage.h>
 #include <gst/gstutils.h>
 #include <stdexcept>
 #include <string>
 
 #ifdef DEBUG
 #include <iostream>
-#define GST_ELEMENT_LM_DEBUG_PRINT(...) __VA_ARGS__
+#define GST_LM_DEBUG_PRINT(...) __VA_ARGS__
 #else
-#define GST_ELEMENT_LM_DEBUG_PRINT(...)
+#define GST_LM_DEBUG_PRINT(...)
 #endif
 
-// Helper Life Management class for GstElement
-// It takes care of unrefing the GstElement when it goes out of scope
-// Also it makes sure if the element passed is null
-class GstElementLM {
+template<typename GstType, auto UnrefFn>
+class GstLM
+{
+    using Self = GstLM<GstType, UnrefFn>;
     
     public:
         // Default constructor
         // Necessary for automatic class initialization in FRPipeline
-        GstElementLM() : element(nullptr) {}
+        GstLM() : _el(nullptr) {}
 
-        GstElementLM(GstElement* element) : element(nullptr) {
-            if (!element) {
-                throw std::runtime_error("Failed to create GstElement");
+        explicit GstLM(GstType* element) : GstLM(element, true) {}
+
+        GstLM(GstType* element, bool throw_on_null) {
+            if (!element && throw_on_null) {
+                throw std::runtime_error(std::string("Failed to create ") + GstTypeName);
             }
-            if (this->element) {
-                throw std::runtime_error("GstElement is already set");
-            }
-            this->element = element;
+            this->_el = element;
         }
 
-        GstElementLM(const GstElementLM& other) = delete;        
-        GstElementLM& operator=(const GstElementLM& other) = delete;
+        GstLM(const Self& other) = delete;
+        GstLM& operator=(const Self& other) = delete;
 
-        GstElementLM(GstElementLM&& other) noexcept{
-            this->element = other.element;
-            other.element = nullptr;
+        GstLM(Self&& other) noexcept{
+            this->_el = other._el;
+            other._el = nullptr;
         }
 
-        GstElementLM& operator=(GstElementLM&& other) noexcept {
-            this->element = other.element;
-            other.element = nullptr;
+        GstLM& operator=(Self&& other) noexcept {
+            this->_el = other._el;
+            other._el = nullptr;
 
             return *this;
         }
 
-        ~GstElementLM() {
-            if (element) {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstElement: " << GST_ELEMENT_NAME(element) << std::endl;)
-                gst_object_unref(element);
+        ~GstLM() {
+            if (_el) {
+                GST_LM_DEBUG_PRINT(std::cout << "Unrefing " << GstTypeName << ": " << GST_OBJECT_NAME(_el) << std::endl;)
+                UnrefFn(_el);
             }
             else {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstElement since it is null" << std::endl;)
+                GST_LM_DEBUG_PRINT(std::cout << "Skipping unrefing " << GST_OBJECT_NAME << " since it is null" << std::endl;)
             }
         }
 
-        GstElement* unpack() {
-            if (!element) {
-                throw std::runtime_error("GstElement is not set");
+        GstType* unpack() {
+            if (!_el) {
+                throw std::runtime_error(GstTypeName + std::string(" is not set"));
             }
 
-            GstElement* temp = element;
-            element = nullptr;
+            GstType* temp = _el;
+            _el = nullptr;
             return temp;
         }
         
-
-        GstElement* get() const {
-            if (!element) {
-                throw std::runtime_error("Trying to get a missing element! It was probably moved.");
+        GstType* get() const {
+            if (!_el) {
+                throw std::runtime_error(std::string("Trying to get a missing ") + GstTypeName + "! It was probably moved.");
             }
-            return element;
+            return _el;
         }
 
     protected:
-        GstElement* element;
+        GstType* _el;
+
+        static constexpr const char * GstTypeName = "GstType";
 };
+
+using GstElementLM  = GstLM<GstElement, gst_object_unref>;
+using GstBusLM      = GstLM<GstBus,     gst_object_unref>;
+using GstMessageLM  = GstLM<GstMessage, gst_message_unref>;
+using GstPadLM      = GstLM<GstPad,     gst_object_unref>;
+using GstCapsLM     = GstLM<GstCaps,    gst_caps_unref>;
 
 class GstPipelineLM: public GstElementLM {
     public:
         GstPipelineLM() : GstElementLM() {}
-        GstPipelineLM(GstElement* element) : GstElementLM(element) {}
+
+        explicit GstPipelineLM(GstElement* pipeline) : GstElementLM(pipeline) {}
+
+        GstPipelineLM(const GstPipelineLM& other) = delete;
+        GstPipelineLM& operator=(const GstPipelineLM& other) = delete;
 
         GstPipelineLM(GstPipelineLM&& other) noexcept{
-            this->element = other.element;
-            other.element = nullptr;
+            this->_el = other._el;
+            other._el = nullptr;
         }
 
         GstPipelineLM& operator=(GstPipelineLM&& other) noexcept {
-            this->element = other.element;
-            other.element = nullptr;
+            this->_el = other._el;
+            other._el = nullptr;
 
             return *this;
         }
 
         ~GstPipelineLM() {
-            if (element) {
-                gst_element_set_state(element, GST_STATE_NULL);
+            if (_el) {
+                gst_element_set_state(_el, GST_STATE_NULL);
             }
         }
 
@@ -113,7 +125,7 @@ class GstPipelineLM: public GstElementLM {
             bool res = gst_bin_add(GST_BIN(get()), element.get());
 
             if (res != TRUE) {
-                GST_ELEMENT_LM_DEBUG_PRINT(g_printerr("Element could not be added to pipeline.\n");)
+                GST_LM_DEBUG_PRINT(g_printerr("Element could not be added to pipeline.\n");)
                 throw std::runtime_error("Failed to add element to pipeline");
             }
             
@@ -125,7 +137,7 @@ class GstPipelineLM: public GstElementLM {
             GstElement* element2 = gst_bin_get_by_name(GST_BIN(get()), el2.c_str());
 
             if (gst_element_link(element1, element2) != TRUE) {
-                GST_ELEMENT_LM_DEBUG_PRINT(g_printerr("Elements could not be linked.\n");)
+                GST_LM_DEBUG_PRINT(g_printerr("Elements could not be linked.\n");)
                 throw std::runtime_error("Pipeline elements could not be linked");
             }
         }
@@ -138,204 +150,4 @@ class GstPipelineLM: public GstElementLM {
         }
 };
 
-class GstBusLM {
-    public:
-        GstBusLM() : bus(nullptr) {}
-        GstBusLM(GstBus* bus) : bus(nullptr) {
-            if (!bus) {
-                throw std::runtime_error("Failed to create GstBus");
-            }
-            if (this->bus) {
-                throw std::runtime_error("GstBus is already set");
-            }
-            this->bus = bus;
-        }
-
-        GstBusLM(const GstBusLM& other) = delete;        
-        GstBusLM& operator=(const GstBusLM& other) = delete;
-
-        GstBusLM(GstBusLM&& other) noexcept{
-            this->bus = other.bus;
-            other.bus = nullptr;
-        }
-
-        GstBusLM& operator=(GstBusLM&& other) noexcept {
-            this->bus = other.bus;
-            other.bus = nullptr;
-
-            return *this;
-        }
-
-        ~GstBusLM() {
-            if (bus) {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstBus" << std::endl;)
-                gst_object_unref(bus);
-            }
-            else {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstBus since it is null" << std::endl;)
-            }
-        }
-
-        GstBus* get() const {
-            if (!bus) {
-                throw std::runtime_error("Trying to get a missing bus!");
-            }
-            return bus;
-        }
-
-    protected:
-        GstBus* bus;
-};
-
-class GstMessageLM {
-    public:
-        GstMessageLM() : msg(nullptr) {}
-        GstMessageLM(GstMessage* msg) : msg(nullptr) {
-            if (!msg) {
-                throw std::runtime_error("Failed to create GstMessage");
-            }
-            if (this->msg) {
-                throw std::runtime_error("GstMessage is already set");
-            }
-            this->msg = msg;
-        }
-
-        GstMessageLM(const GstMessageLM& other) = delete;        
-        GstMessageLM& operator=(const GstMessageLM& other) = delete;
-
-        GstMessageLM(GstMessageLM&& other) noexcept{
-            this->msg = other.msg;
-            other.msg = nullptr;
-        }
-
-        GstMessageLM& operator=(GstMessageLM&& other) noexcept {
-            this->msg = other.msg;
-            other.msg = nullptr;
-
-            return *this;
-        }
-
-        ~GstMessageLM() {
-            if (msg) {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstMessage: " << GST_MESSAGE_TYPE(msg) << std::endl;)
-                gst_message_unref(msg);
-            }
-            else {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstMessage since it is null" << std::endl;)
-            }
-        }
-
-        GstMessage* get() const {
-            if (!msg) {
-                throw std::runtime_error("Trying to get a missing msg!");
-            }
-            return msg;
-        }
-
-    protected:
-        GstMessage* msg;
-};
-
-class GstCapsLM {
-    public:
-        GstCapsLM() : caps(nullptr) {}
-
-        GstCapsLM(GstCaps* caps, bool allow_null) : caps(nullptr) {
-            if (!caps && !allow_null) {
-                throw std::runtime_error("Failed to create GstCaps");
-            }
-            if (this->caps) {
-                throw std::runtime_error("GstCaps is already set");
-            }
-            this->caps = caps;
-        }
-
-        GstCapsLM(GstCaps* caps) : GstCapsLM(caps, false) {}
-
-        GstCapsLM(const GstCapsLM& other) = delete;        
-        GstCapsLM& operator=(const GstCapsLM& other) = delete;
-
-        GstCapsLM(GstCapsLM&& other) noexcept{
-            this->caps = other.caps;
-            other.caps = nullptr;
-        }
-
-        GstCapsLM& operator=(GstCapsLM&& other) noexcept {
-            this->caps = other.caps;
-            other.caps = nullptr;
-
-            return *this;
-        }
-
-        ~GstCapsLM() {
-            if (caps) {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstCaps" << std::endl;)
-                gst_caps_unref(caps);
-            }
-            else {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstCaps since it is null" << std::endl;)
-            }
-        }
-
-        GstCaps* get() const {
-            if (!caps) {
-                throw std::runtime_error("Trying to get a missing caps!");
-            }
-            return caps;
-        }
-
-    protected:
-        GstCaps* caps;
-};
-
-class GstPadLM {
-    public:
-        GstPadLM() : pad(nullptr) {}
-
-        GstPadLM(GstPad* pad) : pad(nullptr) {
-            if (!pad) {
-                throw std::runtime_error("Failed to create GstPad");
-            }
-            if (this->pad) {
-                throw std::runtime_error("GstPad is already set");
-            }
-            this->pad = pad;
-        }
-
-        GstPadLM(const GstPadLM& other) = delete;        
-        GstPadLM& operator=(const GstPadLM& other) = delete;
-
-        GstPadLM(GstPadLM&& other) noexcept{
-            this->pad = other.pad;
-            other.pad = nullptr;
-        }
-
-        GstPadLM& operator=(GstPadLM&& other) noexcept {
-            this->pad = other.pad;
-            other.pad = nullptr;
-
-            return *this;
-        }
-
-        ~GstPadLM() {
-            if (pad) {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Unrefing GstPad" << std::endl;)
-                gst_object_unref(pad);
-            }
-            else {
-                GST_ELEMENT_LM_DEBUG_PRINT(std::cout << "Skipping unrefing GstPad since it is null" << std::endl;)
-            }
-        }
-
-        GstPad* get() const {
-            if (!pad) {
-                throw std::runtime_error("Trying to get a missing pad!");
-            }
-            return pad;
-        }
-
-    protected:
-        GstPad* pad;
-};
-
-#undef GST_ELEMENT_LM_DEBUG_PRINT
+#undef GST_LM_DEBUG_PRINT
