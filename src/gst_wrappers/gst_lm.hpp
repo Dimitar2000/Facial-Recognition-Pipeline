@@ -4,6 +4,7 @@
 #include <gst/gstbus.h>
 #include <gst/gstelement.h>
 #include <gst/gstmessage.h>
+#include <gst/gstpipeline.h>
 #include <gst/gstutils.h>
 #include <stdexcept>
 #include <string>
@@ -14,6 +15,12 @@
 #else
 #define GST_LM_DEBUG_PRINT(...)
 #endif
+
+template<typename T>
+struct GstTypeName
+{
+    static constexpr const char * value = "GstObject";
+};
 
 template<typename GstType, auto UnrefFn>
 class GstLM
@@ -29,7 +36,7 @@ class GstLM
 
         GstLM(GstType* element, bool throw_on_null) {
             if (!element && throw_on_null) {
-                throw std::runtime_error(std::string("Failed to create ") + GstTypeName);
+                throw std::runtime_error("Failed to create " + _type_name());
             }
             this->_el = element;
         }
@@ -45,7 +52,7 @@ class GstLM
         GstLM& operator=(Self&& other) {
             if (this->_el)
             {
-                throw std::runtime_error(std::string("Cannot move assign ") + GstTypeName + ": already set!");
+                throw std::runtime_error("Cannot move assign " + _type_name() + ": already set!");
             }
 
             this->_el = other._el;
@@ -56,7 +63,7 @@ class GstLM
 
         ~GstLM() {
             if (_el) {
-                GST_LM_DEBUG_PRINT(std::cout << "Unrefing " << GstTypeName << ": " << GST_OBJECT_NAME(_el) << std::endl;)
+                GST_LM_DEBUG_PRINT(std::cout << "Unrefing " << _type_name() << ": " << GST_OBJECT_NAME(_el) << std::endl;)
                 UnrefFn(_el);
             }
             else {
@@ -66,7 +73,7 @@ class GstLM
 
         GstType* unpack() {
             if (!_el) {
-                throw std::runtime_error(GstTypeName + std::string(" is not set"));
+                throw std::runtime_error(_type_name() + " is not set");
             }
 
             GstType* temp = _el;
@@ -76,21 +83,52 @@ class GstLM
         
         GstType* get() const {
             if (!_el) {
-                throw std::runtime_error(std::string("Trying to get a missing ") + GstTypeName + "! It was probably moved.");
+                throw std::runtime_error("Trying to get a missing " + _type_name() + "! It was probably moved.");
             }
             return _el;
         }
 
     protected:
+        static const std::string _type_name() {
+            return GstTypeName<GstType>::value; 
+        }
+        
         GstType* _el;
-
-        static constexpr const char * GstTypeName = "GstType";
 };
 
+template<>
+struct GstTypeName<GstElement>
+{
+    static constexpr const char * value = "GstElement";
+};
 using GstElementLM  = GstLM<GstElement, gst_object_unref>;
+
+template<>
+struct GstTypeName<GstBus>
+{
+    static constexpr const char * value = "GstElement";
+};
 using GstBusLM      = GstLM<GstBus,     gst_object_unref>;
+
+template<>
+struct GstTypeName<GstMessage>
+{
+    static constexpr const char * value = "GstElement";
+};
 using GstMessageLM  = GstLM<GstMessage, gst_message_unref>;
+
+template<>
+struct GstTypeName<GstPad>
+{
+    static constexpr const char * value = "GstElement";
+};
 using GstPadLM      = GstLM<GstPad,     gst_object_unref>;
+
+template<>
+struct GstTypeName<GstCaps>
+{
+    static constexpr const char * value = "GstElement";
+};
 using GstCapsLM     = GstLM<GstCaps,    gst_caps_unref>;
 
 class GstPipelineLM: public GstElementLM {
