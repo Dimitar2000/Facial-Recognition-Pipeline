@@ -37,12 +37,17 @@ class GstLM
         GstLM(const Self& other) = delete;
         GstLM& operator=(const Self& other) = delete;
 
-        GstLM(Self&& other) noexcept{
+        GstLM(Self&& other) noexcept {
             this->_el = other._el;
             other._el = nullptr;
         }
 
-        GstLM& operator=(Self&& other) noexcept {
+        GstLM& operator=(Self&& other) {
+            if (this->_el)
+            {
+                throw std::runtime_error(std::string("Cannot move assign ") + GstTypeName + ": already set!");
+            }
+
             this->_el = other._el;
             other._el = nullptr;
 
@@ -102,7 +107,12 @@ class GstPipelineLM: public GstElementLM {
             other._el = nullptr;
         }
 
-        GstPipelineLM& operator=(GstPipelineLM&& other) noexcept {
+        GstPipelineLM& operator=(GstPipelineLM&& other) {
+            if (this->_el)
+            {
+                throw std::runtime_error("Cannot move assign pipeline: already set!");
+            }
+
             this->_el = other._el;
             other._el = nullptr;
 
